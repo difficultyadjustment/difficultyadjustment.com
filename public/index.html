@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bitcoin Intelligence Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <span class="logo">₿</span>
+        <h1>Bitcoin<span class="accent">Intel</span></h1>
+        <span class="tagline">Bitcoin Intelligence Dashboard</span>
+      </div>
+      <div class="header-right">
+        <div class="live-dot"></div>
+        <span class="last-update" id="lastUpdate">Loading...</span>
+        <button class="refresh-btn" onclick="refreshAll()">↻ Refresh</button>
+      </div>
+    </header>
+
+    <!-- Fear & Greed Banner -->
+    <div class="fng-banner" id="fngBanner">
+      <div class="fng-gauge">
+        <div class="fng-circle" id="fngCircle">
+          <span class="fng-value" id="fngValue">--</span>
+        </div>
+      </div>
+      <div class="fng-info">
+        <span class="fng-label">Fear & Greed Index</span>
+        <span class="fng-class" id="fngClass">Loading...</span>
+        <span class="fng-context" id="fngContext"></span>
+      </div>
+      <div class="fng-chart-container">
+        <canvas id="fngChart" height="60"></canvas>
+      </div>
+    </div>
+
+    <!-- Global Stats Bar -->
+    <div class="stats-bar" id="globalStats">
+      <div class="stat highlight-stat">
+        <span class="stat-label">₿ Dominance</span>
+        <span class="stat-value btc-orange" id="btcDom">--</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Total Market Cap</span>
+        <span class="stat-value" id="totalMcap">--</span>
+        <span class="stat-change" id="mcapChange">--</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">24h Volume</span>
+        <span class="stat-value" id="totalVol">--</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">ETH/BTC Ratio</span>
+        <span class="stat-value" id="ethBtcRatio">--</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Active Coins</span>
+        <span class="stat-value" id="activeCoins">--</span>
+      </div>
+    </div>
+
+    <!-- Main Grid -->
+    <div class="main-grid">
+      <!-- BTC Hero Card -->
+      <div class="card btc-hero">
+        <div class="card-header">
+          <div class="coin-identity">
+            <img id="btcLogo" class="coin-logo" alt="BTC">
+            <div>
+              <h2>Bitcoin</h2>
+              <span class="ticker">BTC — The only one that matters</span>
+            </div>
+          </div>
+          <div class="price-block">
+            <span class="price" id="btcPrice">--</span>
+            <span class="change" id="btcChange">--</span>
+          </div>
+        </div>
+        <div class="chart-tabs">
+          <button class="tab active" onclick="loadChart('bitcoin', 1, this)">24H</button>
+          <button class="tab" onclick="loadChart('bitcoin', 7, this)">7D</button>
+          <button class="tab" onclick="loadChart('bitcoin', 30, this)">30D</button>
+          <button class="tab" onclick="loadChart('bitcoin', 90, this)">90D</button>
+          <button class="tab" onclick="loadChart('bitcoin', 365, this)">1Y</button>
+          <button class="tab" onclick="loadChart('bitcoin', 'max', this)">ALL</button>
+        </div>
+        <div class="chart-wrapper">
+          <canvas id="btcChart"></canvas>
+        </div>
+        <div class="btc-stats" id="btcStats"></div>
+      </div>
+
+      <!-- Technical Analysis Card -->
+      <div class="card ta-card">
+        <div class="card-header">
+          <h3>📈 Technical Analysis</h3>
+          <span class="badge" id="taSignal">--</span>
+        </div>
+        <div class="ta-content" id="taContent">
+          <div class="ta-loading">Running TA...</div>
+        </div>
+      </div>
+
+      <!-- Bitcoin Vitals -->
+      <div class="card vitals-card">
+        <div class="card-header">
+          <h3>⛏️ Bitcoin Vitals</h3>
+        </div>
+        <div class="vitals-content" id="vitalsContent">
+          <div class="ta-loading">Loading...</div>
+        </div>
+      </div>
+
+      <!-- Shitcoin Index (formerly Price Table) -->
+      <div class="card price-table-card">
+        <div class="card-header">
+          <h3>📉 Shitcoin Index</h3>
+          <span class="shitcoin-disclaimer">Shown for context. Not endorsements.</span>
+        </div>
+        <div class="table-wrapper">
+          <table class="price-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Token</th>
+                <th>Price</th>
+                <th>1h</th>
+                <th>24h</th>
+                <th>7d</th>
+                <th>vs BTC (7d)</th>
+                <th>Market Cap</th>
+                <th class="sparkline-col">7D Chart</th>
+              </tr>
+            </thead>
+            <tbody id="priceTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- News Feed -->
+      <div class="card news-card">
+        <div class="card-header">
+          <h3>📰 Bitcoin News</h3>
+          <span class="news-count" id="newsCount"></span>
+        </div>
+        <div class="news-feed" id="newsFeed">
+          <div class="ta-loading">Loading news...</div>
+        </div>
+      </div>
+    </div>
+
+    <footer class="footer">
+      <span>₿ Bitcoin Intelligence Dashboard • There is no second best • Data: CoinGecko • Fear & Greed: Alternative.me</span>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

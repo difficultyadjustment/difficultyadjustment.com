@@ -3,7 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bitcoin Intelligence Dashboard</title>
+  <title>₿ Bitcoin Intelligence Dashboard</title>
+  <meta name="description" content="Real-time Bitcoin intelligence — price charts, technical analysis, Fear & Greed index, and curated news. There is no second best.">
+  <meta property="og:title" content="Bitcoin Intelligence Dashboard">
+  <meta property="og:description" content="Real-time Bitcoin intelligence — charts, TA, Fear & Greed, news. There is no second best.">
+  <meta property="og:type" content="website">
+  <meta name="theme-color" content="#f7931a">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>₿</text></svg>">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -58,13 +64,13 @@
         <span class="stat-label">24h Volume</span>
         <span class="stat-value" id="totalVol">--</span>
       </div>
-      <div class="stat">
-        <span class="stat-label">ETH/BTC Ratio</span>
-        <span class="stat-value" id="ethBtcRatio">--</span>
+      <div class="stat highlight-stat">
+        <span class="stat-label">Sats / Dollar</span>
+        <span class="stat-value btc-orange" id="satsPerDollar">--</span>
       </div>
       <div class="stat">
-        <span class="stat-label">Active Coins</span>
-        <span class="stat-value" id="activeCoins">--</span>
+        <span class="stat-label">24h Mcap Change</span>
+        <span class="stat-value" id="mcap24hDelta">--</span>
       </div>
     </div>
 

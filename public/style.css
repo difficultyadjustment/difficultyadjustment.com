@@ -444,6 +444,38 @@ body {
 
 .vitals-content { display: flex; flex-direction: column; gap: 0; }
 
+.supply-bar-wrapper {
+  padding: 12px 0 4px;
+}
+
+.supply-bar-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.supply-bar-labels .mined {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.supply-bar {
+  width: 100%;
+  height: 10px;
+  background: var(--bg-primary);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.supply-bar-fill {
+  height: 100%;
+  background: var(--btc-gradient);
+  border-radius: 5px;
+  transition: width 1s ease;
+}
+
 .vital-row {
   display: flex;
   justify-content: space-between;
@@ -564,6 +596,10 @@ body {
   border-color: var(--border-light);
   transform: translateY(-2px);
   box-shadow: var(--shadow-lg);
+}
+
+.news-item.btc-news {
+  border-left: 3px solid var(--accent);
 }
 
 .news-item a {

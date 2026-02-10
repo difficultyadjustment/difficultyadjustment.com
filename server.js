@@ -146,7 +146,21 @@ app.get('/api/news', cached('news', 300000, async () => {
   if (!resp.ok) throw new Error('News ' + resp.status);
   const data = await resp.json();
   if (!data.Data) return [];
-  return data.Data.slice(0, 20).map(a => ({
+  
+  // Server-side filtering: Bitcoin + macro only
+  const shitcoinTitleRegex = /\b(XRP|ripple|solana|SOL|cardano|ADA|dogecoin|DOGE|shiba|SHIB|avalanche|AVAX|polkadot|DOT|chainlink|LINK|tron|TRX|meme.?coin|altcoin|NFT|airdrop|SNX|synthetix|aave|uniswap|pancake|pepe|bonk|floki|SEI|sui |aptos|arbitrum|optimism|base chain|polygon|matic|cosmos|ATOM|near protocol|hedera|HBAR|stellar|XLM|toncoin|TON |DYDX|dYdX|DEXE|DeXe|binance coin|BNB|stablecoin|USDT|USDC|tether(?! manipulat)|CZ:|Changpeng|manta|mantle|render|FET|INJ|injective|worldcoin|WLD|jupiter|JUP|ondo|ONDO|pendle|ethena|ENA|celestia|TIA|starknet|STRK|lido|eigenlayer|blur)\b/i;
+  const irrelevantRegex = /\b(AUD\/USD|EUR\/USD|GBP\/USD|USD\/JPY|forex|figure skating|olympics|music|celebrity|dating|fashion|horoscope|astrology|sports|soccer|football|basketball|AI\.com|domain name)\b/i;
+  
+  const filtered = data.Data.filter(a => {
+    const title = a.title || '';
+    // Reject shitcoin-focused headlines
+    if (shitcoinTitleRegex.test(title)) return false;
+    // Reject irrelevant content
+    if (irrelevantRegex.test(title)) return false;
+    return true;
+  });
+  
+  return filtered.slice(0, 20).map(a => ({
     title: a.title,
     url: a.url,
     source: a.source_info?.name || 'Unknown',

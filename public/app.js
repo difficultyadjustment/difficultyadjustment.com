@@ -110,6 +110,14 @@ function renderBTCHero(btc) {
   document.getElementById('btcPrice').textContent = fmt.price(btc.current_price);
   fmt.change(document.getElementById('btcChange'), btc.price_change_percentage_24h);
 
+  // Dynamic page title with price
+  document.title = fmt.price(btc.current_price) + ' — Bitcoin Intelligence Dashboard';
+
+  // Sats per dollar
+  const satsPerDollar = Math.round(100000000 / btc.current_price);
+  const satsEl = document.getElementById('satsPerDollar');
+  if (satsEl) satsEl.textContent = satsPerDollar.toLocaleString();
+
   const stats = document.getElementById('btcStats');
   stats.innerHTML = [
     { label: '24h High', value: fmt.price(btc.high_24h) },
@@ -128,22 +136,31 @@ function renderVitals(btc) {
   const container = document.getElementById('vitalsContent');
   const supplyPct = ((btc.circulating_supply / btc.max_supply) * 100).toFixed(1);
   const halvingEst = '~April 2028';
+  const satsPerDollar = Math.round(100000000 / btc.current_price);
 
-  container.innerHTML = [
+  const supplyBar = '<div class="supply-bar-wrapper">' +
+    '<div class="supply-bar-labels">' +
+      '<span>' + fmt.supply(btc.circulating_supply) + ' mined</span>' +
+      '<span class="mined">' + supplyPct + '% of 21M</span>' +
+    '</div>' +
+    '<div class="supply-bar"><div class="supply-bar-fill" style="width:' + supplyPct + '%"></div></div>' +
+  '</div>';
+
+  const rows = [
     { label: 'Market Cap', val: fmt.mcap(btc.market_cap) },
-    { label: 'Circulating Supply', val: fmt.supply(btc.circulating_supply) + ' / 21M' },
-    { label: 'Supply Mined', val: supplyPct + '%' },
     { label: 'Market Cap Rank', val: '#' + btc.market_cap_rank },
     { label: '24h Volume', val: fmt.vol(btc.total_volume) },
     { label: 'Vol/MCap Ratio', val: (btc.total_volume / btc.market_cap * 100).toFixed(2) + '%' },
     { label: 'Next Halving', val: halvingEst },
     { label: 'ATH Date', val: btc.ath_date ? new Date(btc.ath_date).toLocaleDateString() : '--' },
-  ].map(r => `
-    <div class="vital-row">
-      <span class="vital-label">${r.label}</span>
-      <span class="vital-val">${r.val}</span>
-    </div>
-  `).join('');
+  ];
+
+  container.innerHTML = supplyBar + rows.map(function(r) {
+    return '<div class="vital-row">' +
+      '<span class="vital-label">' + r.label + '</span>' +
+      '<span class="vital-val">' + r.val + '</span>' +
+    '</div>';
+  }).join('');
 }
 
 function renderBTCChart(prices, days) {
@@ -276,13 +293,11 @@ function renderGlobal(data) {
   document.getElementById('totalVol').textContent = fmt.vol(data.total_volume?.usd || 0);
   document.getElementById('btcDom').textContent = (data.market_cap_percentage?.btc || 0).toFixed(1) + '%';
 
-  // ETH/BTC ratio
-  const btcMcap = data.market_cap_percentage?.btc || 0;
-  const ethMcap = data.market_cap_percentage?.eth || 0;
-  const ratio = btcMcap > 0 ? (ethMcap / btcMcap).toFixed(3) : '--';
-  document.getElementById('ethBtcRatio').textContent = ratio;
-
-  document.getElementById('activeCoins').textContent = (data.active_cryptocurrencies || 0).toLocaleString();
+  // 24h market cap delta
+  const mcap24h = data.market_cap_change_percentage_24h_usd || 0;
+  const deltaEl = document.getElementById('mcap24hDelta');
+  deltaEl.textContent = fmt.pct(mcap24h);
+  deltaEl.className = 'stat-value ' + (mcap24h >= 0 ? 'positive' : 'negative');
 }
 
 function renderPriceTable(coins, btc) {
@@ -433,9 +448,10 @@ function renderTA(data) {
       <div class="ta-meter">
         <div class="ta-meter-fill" style="width:${((finalScore + 1) / 2) * 100}%;background:${signalClass === 'bullish' ? '#22c55e' : signalClass === 'bearish' ? '#ef4444' : '#eab308'}"></div>
       </div>
-      <div style="display:flex;justify-content:space-between;margin-top:6px;">
-        <span style="font-size:11px;color:var(--red)">Bearish</span>
-        <span style="font-size:11px;color:var(--green)">Bullish</span>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
+        <span style="font-size:11px;color:var(--red)">🐻 Bearish</span>
+        <span style="font-size:13px;font-weight:700;color:${signalClass === 'bullish' ? '#22c55e' : signalClass === 'bearish' ? '#ef4444' : '#eab308'}">${signalText} (${(finalScore * 100).toFixed(0)}%)</span>
+        <span style="font-size:11px;color:var(--green)">Bullish 🐂</span>
       </div>
     </div>
   `;
@@ -453,20 +469,41 @@ function renderNews(articles) {
   const feed = document.getElementById('newsFeed');
   document.getElementById('newsCount').textContent = articles.length + ' articles';
 
-  // Prioritize Bitcoin-related news
-  const btcNews = articles.filter(a =>
-    /bitcoin|btc|halving|saylor|strategy|mining|lightning|layer.?2|taproot|ordinal/i.test(a.title + a.body + a.categories)
-  );
-  const otherNews = articles.filter(a => !btcNews.includes(a));
+  // Filter: Bitcoin-first. Deprioritize shitcoin-focused articles.
+  const shitcoinRegex = /\b(XRP|ripple|solana|SOL|cardano|ADA|dogecoin|DOGE|shiba|SHIB|avalanche|AVAX|polkadot|DOT|chainlink|LINK|tron|TRX|meme.?coin|altcoin season)\b/i;
+  const btcRegex = /bitcoin|btc|halving|saylor|strategy|mining|lightning|layer.?2|taproot|ordinal|satoshi|blockstream|bisq|mempool|hashrate/i;
+  const macroRegex = /fed|interest rate|inflation|treasury|regulation|sec |etf|wall street|macro|dollar|tariff/i;
+
+  const btcNews = articles.filter(a => {
+    const text = a.title + ' ' + a.body + ' ' + a.categories;
+    // Must be BTC or macro related, NOT primarily about a shitcoin
+    const isBtc = btcRegex.test(text) || macroRegex.test(text);
+    const isShitcoin = shitcoinRegex.test(a.title); // only check title — body might mention them in passing
+    return isBtc && !isShitcoin;
+  });
+  const otherNews = articles.filter(a => {
+    if (btcNews.includes(a)) return false;
+    const isShitcoin = shitcoinRegex.test(a.title);
+    return !isShitcoin; // allow macro/general, just not shitcoin headlines
+  });
   const sorted = [...btcNews, ...otherNews];
+
+  // Detect repeated/default images and hide them
+  const imageCounts = {};
+  sorted.forEach(a => { imageCounts[a.image] = (imageCounts[a.image] || 0) + 1; });
 
   feed.innerHTML = sorted.slice(0, 9).map(a => {
     const tags = (a.categories || '').split('|').filter(t => t && t !== 'N/A').slice(0, 3);
     const isBtc = btcNews.includes(a);
+    // Hide default/repeated logos — only show unique editorial images
+    const isDefaultImg = (imageCounts[a.image] || 0) > 1 || /\/default\.|resources\.cryptocompare/.test(a.image);
+    const imgHtml = isDefaultImg
+      ? '<div class="news-image-fallback">₿</div>'
+      : '<img class="news-image" src="' + a.image + '" alt="" onerror="this.outerHTML=\'<div class=news-image-fallback>₿</div>\'">';
 
     return '<div class="news-item' + (isBtc ? ' btc-news' : '') + '">' +
       '<a href="' + a.url + '" target="_blank" rel="noopener">' +
-        '<img class="news-image" src="' + a.image + '" alt="" onerror="this.outerHTML=\'<div class=news-image-fallback>₿</div>\'">' +
+        imgHtml +
         '<div class="news-content">' +
           '<div class="news-meta">' +
             '<span class="news-source">' + a.source + '</span>' +

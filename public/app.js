@@ -99,6 +99,12 @@ async function fetchMining() {
   if (data.adjustment) renderMining(data);
 }
 
+async function fetchMacro() {
+  var res = await fetch('/api/macro');
+  var data = await res.json();
+  if (data && typeof data === 'object') renderMacro(data);
+}
+
 async function fetchXPosts() {
   const res = await fetch('/api/x-posts');
   const data = await res.json();
@@ -297,11 +303,10 @@ function renderFearGreed(data) {
 }
 
 function renderGlobal(data) {
-  document.getElementById('totalMcap').textContent = fmt.mcap(data.total_market_cap?.usd || 0);
-  const mcapPct = data.market_cap_change_percentage_24h_usd || 0;
-  const mcapEl = document.getElementById('mcapChange');
-  mcapEl.textContent = fmt.pct(mcapPct);
-  mcapEl.className = 'stat-change ' + (mcapPct >= 0 ? 'positive' : 'negative');
+  // BTC market cap (from total * dominance)
+  const btcDom = (data.market_cap_percentage?.btc || 0) / 100;
+  const btcMcapVal = (data.total_market_cap?.usd || 0) * btcDom;
+  document.getElementById('btcMcap').textContent = fmt.mcap(btcMcapVal);
   document.getElementById('totalVol').textContent = fmt.vol(data.total_volume?.usd || 0);
   document.getElementById('btcDom').textContent = (data.market_cap_percentage?.btc || 0).toFixed(1) + '%';
 
@@ -691,6 +696,124 @@ function renderXPosts(posts) {
   }).join('');
 }
 
+// ===== MACRO =====
+
+var macroSparkCharts = [];
+
+function renderMacro(data) {
+  var grid = document.getElementById('macroGrid');
+
+  // Destroy old spark charts
+  macroSparkCharts.forEach(function(c) { c.destroy(); });
+  macroSparkCharts = [];
+
+  var tiles = [];
+
+  // DXY
+  if (data.dxy) {
+    var d = data.dxy;
+    var sentiment = d.changePct < 0 ? 'bullish-btc' : 'bearish-btc';
+    var context = d.changePct < 0 ? 'Weakening dollar = bullish for BTC' : 'Strengthening dollar = headwind for BTC';
+    tiles.push({ key: 'dxy', name: 'DXY (Dollar Index)', value: d.price.toFixed(2), change: d.changePct, spark: d.sparkline, cls: sentiment, context: context });
+  }
+
+  // M2
+  if (data.m2) {
+    var m = data.m2;
+    var m2Sent = parseFloat(m.yoyChange) > 4 ? 'bullish-btc' : parseFloat(m.yoyChange) > 0 ? 'neutral-btc' : 'bearish-btc';
+    var m2Ctx = 'YoY: ' + (m.yoyChange > 0 ? '+' : '') + m.yoyChange + '% · Expanding M2 = BTC fuel';
+    tiles.push({ key: 'm2', name: 'M2 Money Supply', value: '$' + (m.value / 1000).toFixed(1) + 'T', change: parseFloat(m.momChange), spark: m.sparkline, cls: m2Sent, context: m2Ctx, isMonthly: true });
+  }
+
+  // Fed Rate
+  if (data.fedRate) {
+    var f = data.fedRate;
+    var fedChg = f.prevValue ? f.value - f.prevValue : 0;
+    var fedSent = fedChg < 0 ? 'bullish-btc' : fedChg > 0 ? 'bearish-btc' : 'neutral-btc';
+    var fedCtx = fedChg < 0 ? 'Rates falling = liquidity expanding' : fedChg > 0 ? 'Rates rising = tightening' : 'Rates unchanged';
+    tiles.push({ key: 'fed', name: 'Fed Funds Rate', value: f.value.toFixed(2) + '%', change: fedChg, spark: f.sparkline, cls: fedSent, context: fedCtx, isMonthly: true });
+  }
+
+  // Gold
+  if (data.gold) {
+    var g = data.gold;
+    tiles.push({ key: 'gold', name: 'Gold', value: '$' + g.price.toLocaleString(undefined, {maximumFractionDigits:0}), change: g.changePct, spark: g.sparkline, cls: 'neutral-btc', context: 'Digital gold vs physical gold' });
+  }
+
+  // SPX
+  if (data.spx) {
+    var s = data.spx;
+    var spxSent = s.changePct > 0 ? 'neutral-btc' : 'bearish-btc';
+    tiles.push({ key: 'spx', name: 'S&P 500', value: s.price.toLocaleString(undefined, {maximumFractionDigits:0}), change: s.changePct, spark: s.sparkline, cls: spxSent, context: 'Risk appetite gauge' });
+  }
+
+  // 10Y
+  if (data.yield10y) {
+    var y = data.yield10y;
+    var ySent = y.changePct < 0 ? 'bullish-btc' : 'bearish-btc';
+    tiles.push({ key: 'yield', name: '10Y Treasury', value: y.price.toFixed(3) + '%', change: y.changePct, spark: y.sparkline, cls: ySent, context: y.changePct < 0 ? 'Yields falling = bullish risk' : 'Yields rising = tightening' });
+  }
+
+  // VIX
+  if (data.vix) {
+    var v = data.vix;
+    var vSent = v.price > 25 ? 'bearish-btc' : v.price < 15 ? 'bullish-btc' : 'neutral-btc';
+    var vCtx = v.price > 25 ? 'High fear — risk-off mode' : v.price < 15 ? 'Low vol — complacency' : 'Normal volatility';
+    tiles.push({ key: 'vix', name: 'VIX (Fear)', value: v.price.toFixed(2), change: v.changePct, spark: v.sparkline, cls: vSent, context: vCtx });
+  }
+
+  // Oil
+  if (data.oil) {
+    var o = data.oil;
+    tiles.push({ key: 'oil', name: 'Crude Oil (WTI)', value: '$' + o.price.toFixed(2), change: o.changePct, spark: o.sparkline, cls: 'neutral-btc', context: 'Energy cost / inflation signal' });
+  }
+
+  grid.innerHTML = tiles.map(function(t, i) {
+    var chgClass = t.change > 0 ? 'positive' : t.change < 0 ? 'negative' : '';
+    var chgStr = t.change != null ? ((t.change >= 0 ? '+' : '') + t.change.toFixed(2) + '%') : '';
+    return '<div class="macro-tile ' + t.cls + '">' +
+      '<div class="macro-tile-header">' +
+        '<span class="macro-tile-name">' + t.name + '</span>' +
+        '<span class="macro-tile-change ' + chgClass + '">' + chgStr + '</span>' +
+      '</div>' +
+      '<div class="macro-tile-value">' + t.value + '</div>' +
+      '<div class="macro-tile-spark"><canvas id="macroSpark' + i + '" height="40"></canvas></div>' +
+      '<div class="macro-tile-context">' + t.context + '</div>' +
+    '</div>';
+  }).join('');
+
+  // Render sparklines
+  tiles.forEach(function(t, i) {
+    var el = document.getElementById('macroSpark' + i);
+    if (el && t.spark && t.spark.length > 1) {
+      var vals = t.spark;
+      var isUp = vals[vals.length - 1] >= vals[0];
+      var chart = new Chart(el.getContext('2d'), {
+        type: 'line',
+        data: {
+          labels: vals.map(function(_, j) { return j; }),
+          datasets: [{
+            data: vals,
+            borderColor: isUp ? '#22c55e' : '#ef4444',
+            borderWidth: 1.5,
+            pointRadius: 0,
+            tension: 0.4,
+            fill: false,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: false,
+          scales: { x: { display: false }, y: { display: false } },
+          plugins: { tooltip: { enabled: false } }
+        }
+      });
+      macroSparkCharts.push(chart);
+    }
+  });
+}
+
 // ===== SETTINGS / SECTION TOGGLES =====
 
 function getHiddenSections() {
@@ -772,6 +895,7 @@ async function refreshAll() {
     loadChart('bitcoin', 1).catch(e => console.error('chart failed:', e)),
     fetchNews().catch(e => console.error('news failed:', e)),
     fetchMining().catch(e => console.error('mining failed:', e)),
+    fetchMacro().catch(e => console.error('macro failed:', e)),
   ];
 
   await Promise.allSettled(tasks);

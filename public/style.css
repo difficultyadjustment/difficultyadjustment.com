@@ -911,6 +911,86 @@ body {
   margin-top: 4px;
 }
 
+/* ===== Macro Section ===== */
+.macro-section {
+  margin-bottom: 24px;
+}
+
+.macro-context {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.macro-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.macro-tile {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  transition: border-color 0.2s;
+}
+
+.macro-tile:hover {
+  border-color: var(--border-light);
+}
+
+.macro-tile-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.macro-tile-name {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-weight: 600;
+}
+
+.macro-tile-change {
+  font-size: 12px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.macro-tile-value {
+  font-size: 22px;
+  font-weight: 800;
+  font-family: 'JetBrains Mono', monospace;
+  margin-bottom: 8px;
+}
+
+.macro-tile-spark {
+  height: 40px;
+}
+
+.macro-tile-context {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 6px;
+  font-style: italic;
+}
+
+.macro-tile.bullish-btc { border-left: 3px solid var(--green); }
+.macro-tile.bearish-btc { border-left: 3px solid var(--red); }
+.macro-tile.neutral-btc { border-left: 3px solid var(--yellow); }
+
+@media (max-width: 1024px) {
+  .macro-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 640px) {
+  .macro-grid { grid-template-columns: 1fr; }
+}
+
 /* ===== News + Vitals Grid ===== */
 .news-vitals-grid {
   display: grid;

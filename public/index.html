@@ -41,6 +41,7 @@
       <label class="settings-toggle"><input type="checkbox" data-section="btc-hero" checked onchange="toggleSection(this)"> BTC Price & Chart</label>
       <label class="settings-toggle"><input type="checkbox" data-section="ta" checked onchange="toggleSection(this)"> Technical Analysis</label>
       <label class="settings-toggle"><input type="checkbox" data-section="mining" checked onchange="toggleSection(this)"> Mining & Difficulty</label>
+      <label class="settings-toggle"><input type="checkbox" data-section="macro" checked onchange="toggleSection(this)"> Macro Environment</label>
       <label class="settings-toggle"><input type="checkbox" data-section="news" checked onchange="toggleSection(this)"> Bitcoin News & X</label>
       <label class="settings-toggle"><input type="checkbox" data-section="vitals" checked onchange="toggleSection(this)"> Bitcoin Vitals</label>
       <label class="settings-toggle"><input type="checkbox" data-section="shitcoins" checked onchange="toggleSection(this)"> Shitcoin Index</label>
@@ -71,9 +72,8 @@
         <span class="stat-value btc-orange" id="btcDom">--</span>
       </div>
       <div class="stat">
-        <span class="stat-label">Total Market Cap</span>
-        <span class="stat-value" id="totalMcap">--</span>
-        <span class="stat-change" id="mcapChange">--</span>
+        <span class="stat-label">₿ Market Cap</span>
+        <span class="stat-value" id="btcMcap">--</span>
       </div>
       <div class="stat">
         <span class="stat-label">24h Volume</span>
@@ -151,6 +151,19 @@
           <canvas id="hashrateChart" height="180"></canvas>
         </div>
         <div class="hashrate-stats" id="hashrateStats"></div>
+      </div>
+    </div>
+
+    <!-- Macro Section -->
+    <div class="macro-section section-panel" data-section="macro">
+      <div class="card macro-card">
+        <div class="card-header">
+          <h3>🌍 Macro Environment</h3>
+          <span class="macro-context">How the world looks for Bitcoin</span>
+        </div>
+        <div class="macro-grid" id="macroGrid">
+          <div class="ta-loading">Loading macro data...</div>
+        </div>
       </div>
     </div>
 

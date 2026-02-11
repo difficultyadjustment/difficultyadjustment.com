@@ -180,6 +180,114 @@ app.get('/api/news', cached('news', 300000, async () => {
   }));
 }));
 
+// Macro data — cache 600s (10 min)
+app.get('/api/macro', cached('macro', 600000, async () => {
+  // Yahoo Finance tickers
+  const tickers = [
+    { sym: 'DX-Y.NYB', key: 'dxy', name: 'Dollar Index (DXY)' },
+    { sym: 'GC=F', key: 'gold', name: 'Gold' },
+    { sym: '^GSPC', key: 'spx', name: 'S&P 500' },
+    { sym: '^TNX', key: 'yield10y', name: '10Y Treasury' },
+    { sym: '^VIX', key: 'vix', name: 'VIX' },
+    { sym: 'CL=F', key: 'oil', name: 'Crude Oil (WTI)' },
+  ];
+
+  const results = {};
+
+  // Fetch Yahoo tickers in parallel
+  const yahooPromises = tickers.map(async (t) => {
+    try {
+      const url = 'https://query2.finance.yahoo.com/v8/finance/chart/' +
+        encodeURIComponent(t.sym) + '?interval=1d&range=6mo';
+      const resp = await fetch(url, {
+        headers: { 'User-Agent': 'Mozilla/5.0' },
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!resp.ok) return;
+      const data = await resp.json();
+      const r = data.chart?.result?.[0];
+      if (!r) return;
+      const meta = r.meta || {};
+      const closes = (r.indicators?.quote?.[0]?.close || []).filter(c => c != null);
+      const timestamps = (r.timestamp || []);
+      const prev = meta.previousClose || (closes.length > 1 ? closes[closes.length - 2] : null);
+      const price = meta.regularMarketPrice;
+      const changePct = prev ? ((price - prev) / prev * 100) : null;
+
+      results[t.key] = {
+        name: t.name,
+        price,
+        prevClose: prev,
+        changePct,
+        sparkline: closes.slice(-30), // last 30 days for mini chart
+        sparkline6m: closes,
+      };
+    } catch (e) { /* skip failed ticker */ }
+  });
+
+  // Fetch M2 from FRED CSV
+  const fredPromise = (async () => {
+    try {
+      const resp = await fetch('https://fred.stlouisfed.org/graph/fredgraph.csv?id=M2SL', {
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!resp.ok) return;
+      const text = await resp.text();
+      const lines = text.trim().split('\n').slice(1); // skip header
+      const values = lines.map(l => {
+        const [date, val] = l.split(',');
+        return { date, value: parseFloat(val) };
+      }).filter(v => !isNaN(v.value));
+
+      if (values.length >= 2) {
+        const latest = values[values.length - 1];
+        const prev = values[values.length - 2];
+        const yoy = values.length >= 13 ? values[values.length - 13] : null;
+        results.m2 = {
+          name: 'M2 Money Supply',
+          value: latest.value,
+          date: latest.date,
+          momChange: ((latest.value - prev.value) / prev.value * 100).toFixed(2),
+          yoyChange: yoy ? ((latest.value - yoy.value) / yoy.value * 100).toFixed(1) : null,
+          sparkline: values.slice(-24).map(v => v.value), // 24 months
+        };
+      }
+    } catch (e) { /* skip */ }
+  })();
+
+  // Fetch Fed Funds from FRED
+  const fedPromise = (async () => {
+    try {
+      const resp = await fetch('https://fred.stlouisfed.org/graph/fredgraph.csv?id=FEDFUNDS', {
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!resp.ok) return;
+      const text = await resp.text();
+      const lines = text.trim().split('\n').slice(1);
+      const values = lines.map(l => {
+        const [date, val] = l.split(',');
+        return { date, value: parseFloat(val) };
+      }).filter(v => !isNaN(v.value));
+
+      if (values.length) {
+        const latest = values[values.length - 1];
+        const prev = values.length >= 2 ? values[values.length - 2] : null;
+        results.fedRate = {
+          name: 'Fed Funds Rate',
+          value: latest.value,
+          date: latest.date,
+          prevValue: prev ? prev.value : null,
+          sparkline: values.slice(-24).map(v => v.value),
+        };
+      }
+    } catch (e) { /* skip */ }
+  })();
+
+  await Promise.allSettled([...yahooPromises, fredPromise, fedPromise]);
+
+  return results;
+}));
+
 // Mining & Difficulty — cache 300s
 app.get('/api/mining', cached('mining', 300000, async () => {
   const [diffResp, hashResp] = await Promise.all([

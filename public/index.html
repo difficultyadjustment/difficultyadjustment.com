@@ -152,6 +152,13 @@
         <div class="card-header">
           <h3>🔥 Hashrate</h3>
         </div>
+        <div class="chart-tabs mini-tabs">
+          <button class="tab mini active" onclick="loadMining('3m', this)">3M</button>
+          <button class="tab mini" onclick="loadMining('6m', this)">6M</button>
+          <button class="tab mini" onclick="loadMining('1y', this)">1Y</button>
+          <button class="tab mini" onclick="loadMining('2y', this)">2Y</button>
+          <button class="tab mini" onclick="loadMining('3y', this)">3Y</button>
+        </div>
         <div class="hashrate-chart-wrapper">
           <canvas id="hashrateChart" height="180"></canvas>
         </div>
@@ -165,6 +172,14 @@
         <div class="card-header">
           <h3>🌍 Macro Environment</h3>
           <span class="macro-context">How the world looks for Bitcoin</span>
+        </div>
+        <div class="chart-tabs mini-tabs" style="margin-bottom:16px">
+          <button class="tab mini" onclick="loadMacro('1mo', this)">1M</button>
+          <button class="tab mini" onclick="loadMacro('3mo', this)">3M</button>
+          <button class="tab mini active" onclick="loadMacro('6mo', this)">6M</button>
+          <button class="tab mini" onclick="loadMacro('1y', this)">1Y</button>
+          <button class="tab mini" onclick="loadMacro('2y', this)">2Y</button>
+          <button class="tab mini" onclick="loadMacro('5y', this)">5Y</button>
         </div>
         <div class="macro-grid" id="macroGrid">
           <div class="ta-loading">Loading macro data...</div>
@@ -182,6 +197,14 @@
         </div>
         <div class="btc-gold-value" id="btcGoldValue">-- oz</div>
         <div class="btc-gold-context">1 BTC buys this many ounces of gold</div>
+        <div class="chart-tabs mini-tabs">
+          <button class="tab mini" onclick="loadGoldChart('1mo', this)">1M</button>
+          <button class="tab mini" onclick="loadGoldChart('3mo', this)">3M</button>
+          <button class="tab mini active" onclick="loadGoldChart('6mo', this)">6M</button>
+          <button class="tab mini" onclick="loadGoldChart('1y', this)">1Y</button>
+          <button class="tab mini" onclick="loadGoldChart('2y', this)">2Y</button>
+          <button class="tab mini" onclick="loadGoldChart('5y', this)">5Y</button>
+        </div>
         <div class="metric-chart-wrapper"><canvas id="btcGoldChart" height="150"></canvas></div>
       </div>
 
@@ -199,6 +222,13 @@
       <div class="card section-panel" data-section="lightning">
         <div class="card-header">
           <h3>⚡ Lightning Network</h3>
+        </div>
+        <div class="chart-tabs mini-tabs">
+          <button class="tab mini active" onclick="loadLightning('3m', this)">3M</button>
+          <button class="tab mini" onclick="loadLightning('6m', this)">6M</button>
+          <button class="tab mini" onclick="loadLightning('1y', this)">1Y</button>
+          <button class="tab mini" onclick="loadLightning('2y', this)">2Y</button>
+          <button class="tab mini" onclick="loadLightning('3y', this)">3Y</button>
         </div>
         <div class="lightning-content" id="lightningContent">
           <div class="ta-loading">Loading...</div>

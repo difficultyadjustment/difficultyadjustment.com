@@ -93,22 +93,49 @@ async function fetchNews() {
   if (Array.isArray(data) && data.length) renderNews(data);
 }
 
-async function fetchMining() {
-  const res = await fetch('/api/mining');
-  const data = await res.json();
+async function fetchMining(range) {
+  var url = '/api/mining' + (range ? '?range=' + range : '');
+  var res = await fetch(url);
+  var data = await res.json();
   if (data.adjustment) renderMining(data);
 }
 
-async function fetchMacro() {
-  var res = await fetch('/api/macro');
+function loadMining(range, btn) {
+  if (btn) {
+    btn.parentElement.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+    btn.classList.add('active');
+  }
+  fetchMining(range).catch(function(e) { console.error('mining failed:', e); });
+}
+
+async function fetchMacro(range) {
+  var url = '/api/macro' + (range ? '?range=' + range : '');
+  var res = await fetch(url);
   var data = await res.json();
   if (data && typeof data === 'object') renderMacro(data);
 }
 
-async function fetchLightning() {
-  var res = await fetch('/api/lightning');
+function loadMacro(range, btn) {
+  if (btn) {
+    btn.parentElement.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+    btn.classList.add('active');
+  }
+  fetchMacro(range).catch(function(e) { console.error('macro failed:', e); });
+}
+
+async function fetchLightning(range) {
+  var url = '/api/lightning' + (range ? '?range=' + range : '');
+  var res = await fetch(url);
   var data = await res.json();
   if (data.channels) renderLightning(data);
+}
+
+function loadLightning(range, btn) {
+  if (btn) {
+    btn.parentElement.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+    btn.classList.add('active');
+  }
+  fetchLightning(range).catch(function(e) { console.error('lightning failed:', e); });
 }
 
 async function fetchXPosts() {
@@ -738,6 +765,14 @@ function renderBtcGold(btc) {
   var badge = document.getElementById('btcGoldBadge');
   badge.textContent = ratio.toFixed(1) + ' oz/BTC';
   badge.className = 'badge bullish';
+}
+
+function loadGoldChart(range, btn) {
+  if (btn) {
+    btn.parentElement.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+    btn.classList.add('active');
+  }
+  fetchMacro(range).catch(function(e) { console.error('gold chart reload failed:', e); });
 }
 
 function renderBtcGoldChart(goldSparkline) {

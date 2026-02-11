@@ -434,6 +434,9 @@ body {
 .tab:hover { color: var(--text-primary); border-color: var(--border-light); }
 .tab.active { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 700; }
 
+.mini-tabs { margin-bottom: 12px; }
+.tab.mini { padding: 4px 10px; font-size: 11px; }
+
 .chart-wrapper {
   height: 380px;
   margin-bottom: 16px;

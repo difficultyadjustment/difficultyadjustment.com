@@ -180,8 +180,13 @@ app.get('/api/news', cached('news', 300000, async () => {
   }));
 }));
 
-// Macro data — cache 600s (10 min)
-app.get('/api/macro', cached('macro', 600000, async () => {
+// Macro data — cache 600s (10 min, with range support)
+app.get('/api/macro', async (req, res) => {
+  const range = req.query.range || '6mo';
+  const allowed = ['1mo', '3mo', '6mo', '1y', '2y', '5y'];
+  const safeRange = allowed.includes(range) ? range : '6mo';
+  const key = 'macro-' + safeRange;
+  const handler = cached(key, 600000, async () => {
   // Yahoo Finance tickers
   const tickers = [
     { sym: 'DX-Y.NYB', key: 'dxy', name: 'Dollar Index (DXY)' },
@@ -197,8 +202,9 @@ app.get('/api/macro', cached('macro', 600000, async () => {
   // Fetch Yahoo tickers in parallel
   const yahooPromises = tickers.map(async (t) => {
     try {
+      const interval = (safeRange === '2y' || safeRange === '5y') ? '1wk' : '1d';
       const url = 'https://query2.finance.yahoo.com/v8/finance/chart/' +
-        encodeURIComponent(t.sym) + '?interval=1d&range=6mo';
+        encodeURIComponent(t.sym) + '?interval=' + interval + '&range=' + safeRange;
       const resp = await fetch(url, {
         headers: { 'User-Agent': 'Mozilla/5.0' },
         signal: AbortSignal.timeout(10000),
@@ -219,8 +225,7 @@ app.get('/api/macro', cached('macro', 600000, async () => {
         price,
         prevClose: prev,
         changePct,
-        sparkline: closes.slice(-30), // last 30 days for mini chart
-        sparkline6m: closes,
+        sparkline: closes,
       };
     } catch (e) { /* skip failed ticker */ }
   });
@@ -286,7 +291,9 @@ app.get('/api/macro', cached('macro', 600000, async () => {
   await Promise.allSettled([...yahooPromises, fredPromise, fedPromise]);
 
   return results;
-}));
+  });
+  return handler(req, res);
+});
 
 // BTC long-range chart via Yahoo Finance (CoinGecko limits to 365 days)
 app.get('/api/chart-long/:range', async (req, res) => {
@@ -315,12 +322,17 @@ app.get('/api/chart-long/:range', async (req, res) => {
   return handler(req, res);
 });
 
-// Lightning Network stats — cache 600s
-app.get('/api/lightning', cached('lightning', 600000, async () => {
-  const [statsResp, histResp] = await Promise.all([
-    fetch('https://mempool.space/api/v1/lightning/statistics/latest', { signal: AbortSignal.timeout(10000) }),
-    fetch('https://mempool.space/api/v1/lightning/statistics/3m', { signal: AbortSignal.timeout(10000) }),
-  ]);
+// Lightning Network stats — cache 600s (with range support)
+app.get('/api/lightning', async (req, res) => {
+  const range = req.query.range || '3m';
+  const allowed = ['3m', '6m', '1y', '2y', '3y'];
+  const safeRange = allowed.includes(range) ? range : '3m';
+  const key = 'lightning-' + safeRange;
+  const handler = cached(key, 600000, async () => {
+    const [statsResp, histResp] = await Promise.all([
+      fetch('https://mempool.space/api/v1/lightning/statistics/latest', { signal: AbortSignal.timeout(10000) }),
+      fetch('https://mempool.space/api/v1/lightning/statistics/' + safeRange, { signal: AbortSignal.timeout(10000) }),
+    ]);
   if (!statsResp.ok) throw new Error('LN stats ' + statsResp.status);
   const stats = await statsResp.json();
   const latest = stats.latest || {};
@@ -345,14 +357,21 @@ app.get('/api/lightning', cached('lightning', 600000, async () => {
       channels: h.channel_count,
     })),
   };
-}));
+  });
+  return handler(req, res);
+});
 
-// Mining & Difficulty — cache 300s
-app.get('/api/mining', cached('mining', 300000, async () => {
-  const [diffResp, hashResp] = await Promise.all([
-    fetch('https://mempool.space/api/v1/difficulty-adjustment', { signal: AbortSignal.timeout(10000) }),
-    fetch('https://mempool.space/api/v1/mining/hashrate/3m', { signal: AbortSignal.timeout(10000) }),
-  ]);
+// Mining & Difficulty — cache 300s (with range support)
+app.get('/api/mining', async (req, res) => {
+  const range = req.query.range || '3m';
+  const allowed = ['1m', '3m', '6m', '1y', '2y', '3y'];
+  const safeRange = allowed.includes(range) ? range : '3m';
+  const key = 'mining-' + safeRange;
+  const handler = cached(key, 300000, async () => {
+    const [diffResp, hashResp] = await Promise.all([
+      fetch('https://mempool.space/api/v1/difficulty-adjustment', { signal: AbortSignal.timeout(10000) }),
+      fetch('https://mempool.space/api/v1/mining/hashrate/' + safeRange, { signal: AbortSignal.timeout(10000) }),
+    ]);
   if (!diffResp.ok) throw new Error('Mempool diff ' + diffResp.status);
   if (!hashResp.ok) throw new Error('Mempool hash ' + hashResp.status);
   const diff = await diffResp.json();
@@ -364,8 +383,8 @@ app.get('/api/mining', cached('mining', 300000, async () => {
   const latestHash = hashrates.length ? hashrates[hashrates.length - 1] : null;
   const latestDiff = difficulties.length ? difficulties[difficulties.length - 1] : null;
   
-  // Hashrate sparkline (last 30 points)
-  const hashSparkline = hashrates.slice(-30).map(h => ({
+  // Hashrate sparkline (all points for the range)
+  const hashSparkline = hashrates.map(h => ({
     t: h.timestamp * 1000,
     v: h.avgHashrate / 1e18 // EH/s
   }));
@@ -393,7 +412,9 @@ app.get('/api/mining', cached('mining', 300000, async () => {
     hashSparkline,
     diffSparkline,
   };
-}));
+  });
+  return handler(req, res);
+});
 
 // Bitcoin Twitter / X posts — cache 600s (uses Brave Search, rate limited)
 app.get('/api/x-posts', cached('xposts', 600000, async () => {

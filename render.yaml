@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: difficultyadjustment
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3847"
+      - key: BRAVE_API_KEY
+        sync: false
+    autoDeploy: true
+    healthCheckPath: /api/health

@@ -173,8 +173,11 @@ app.get('/api/global', cached('global', 120000, async () => {
 
 // Bitcoin News — cache 300s
 app.get('/api/news', cached('news', 300000, async () => {
-  const url = 'https://min-api.cryptocompare.com/data/v2/news/?lang=EN&sortOrder=popular&categories=BTC,Bitcoin,Mining,Regulation';
-  const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
+  const url = 'https://min-api.cryptocompare.com/data/v2/news/?lang=EN&sortOrder=popular';
+  const resp = await fetch(url, {
+    headers: { 'User-Agent': 'Mozilla/5.0' },
+    signal: AbortSignal.timeout(15000),
+  });
   if (!resp.ok) throw new Error('News ' + resp.status);
   const data = await resp.json();
   if (!data.Data) return [];

@@ -602,14 +602,17 @@ function renderNews(articles) {
   const imageCounts = {};
   sorted.forEach(a => { imageCounts[a.image] = (imageCounts[a.image] || 0) + 1; });
 
-  feed.innerHTML = sorted.slice(0, 9).map(a => {
-    const tags = (a.categories || '').split('|').filter(t => t && t !== 'N/A').slice(0, 3);
-    const isBtc = btcNews.includes(a);
-    // Hide default/repeated logos — only show unique editorial images
-    const isDefaultImg = (imageCounts[a.image] || 0) > 1 || /\/default\.|resources\.cryptocompare/.test(a.image);
-    const imgHtml = isDefaultImg
+  // Show top 3 with images, rest as compact list
+  var top3 = sorted.slice(0, 3);
+  var rest = sorted.slice(3, 15);
+
+  var topHtml = top3.map(function(a) {
+    var isBtc = btcNews.includes(a);
+    var isDefaultImg = (imageCounts[a.image] || 0) > 1 || /\/default\.|resources\.cryptocompare/.test(a.image);
+    var imgHtml = isDefaultImg
       ? '<div class="news-image-fallback">₿</div>'
       : '<img class="news-image" src="' + a.image + '" alt="" onerror="this.outerHTML=\'<div class=news-image-fallback>₿</div>\'">';
+    var tags = (a.categories || '').split('|').filter(function(t) { return t && t !== 'N/A'; }).slice(0, 3);
 
     return '<div class="news-item' + (isBtc ? ' btc-news' : '') + '">' +
       '<a href="' + a.url + '" target="_blank" rel="noopener">' +
@@ -626,6 +629,17 @@ function renderNews(articles) {
       '</a>' +
     '</div>';
   }).join('');
+
+  var listHtml = rest.length ? '<div class="news-list">' + rest.map(function(a) {
+    var isBtc = btcNews.includes(a);
+    return '<a href="' + a.url + '" target="_blank" rel="noopener" class="news-list-item' + (isBtc ? ' btc-news' : '') + '">' +
+      '<span class="news-list-time">' + timeAgo(a.published) + '</span>' +
+      '<span class="news-list-title">' + a.title + '</span>' +
+      '<span class="news-list-source">' + a.source + '</span>' +
+    '</a>';
+  }).join('') + '</div>' : '';
+
+  feed.innerHTML = '<div class="news-top-grid">' + topHtml + '</div>' + listHtml;
 }
 
 // ===== MINING & DIFFICULTY =====

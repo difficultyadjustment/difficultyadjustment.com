@@ -492,29 +492,99 @@ app.get('/api/x-posts', cached('xposts', 600000, async () => {
   return unique.filter(r => !shitcoinRegex.test(r.title)).slice(0, 8);
 }));
 
-// TA — cache 300s
-app.get('/api/ta/:coin', (req, res) => {
+// TA — pure JS implementation (no Python dependency), cache 300s
+app.get('/api/ta/:coin', async (req, res) => {
   const coin = req.params.coin;
-  const cachePath = path.join(CACHE_DIR, `${coin}-ta.json`);
-  try {
-    if (fs.existsSync(cachePath)) {
-      const stat = fs.statSync(cachePath);
-      const age = Date.now() - stat.mtimeMs;
-      if (age < 300000) {
-        return res.json(JSON.parse(fs.readFileSync(cachePath, 'utf8')));
+  const key = 'ta-' + coin;
+  const handler = cached(key, 300000, async () => {
+    // Fetch 90 days of daily data for TA calculations
+    const url = `https://api.coingecko.com/api/v3/coins/${encodeURIComponent(coin)}/market_chart?vs_currency=usd&days=90`;
+    const resp = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    if (!resp.ok) throw new Error('CoinGecko ' + resp.status);
+    const data = await resp.json();
+    const prices = (data.prices || []).map(p => p[1]);
+    if (prices.length < 50) throw new Error('Not enough data');
+
+    const price = prices[prices.length - 1];
+
+    // RSI (14-period)
+    const rsiPeriod = 14;
+    let gains = 0, losses = 0;
+    for (let i = prices.length - rsiPeriod; i < prices.length; i++) {
+      const diff = prices[i] - prices[i - 1];
+      if (diff > 0) gains += diff; else losses -= diff;
+    }
+    const avgGain = gains / rsiPeriod;
+    const avgLoss = losses / rsiPeriod;
+    const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+    const rsi = 100 - (100 / (1 + rs));
+
+    // SMA
+    const sma = (arr, period) => {
+      const slice = arr.slice(-period);
+      return slice.reduce((a, b) => a + b, 0) / slice.length;
+    };
+    const sma_20 = sma(prices, 20);
+    const sma_50 = sma(prices, 50);
+
+    // EMA
+    const ema = (arr, period) => {
+      const k = 2 / (period + 1);
+      let e = arr[0];
+      for (let i = 1; i < arr.length; i++) e = arr[i] * k + e * (1 - k);
+      return e;
+    };
+    const ema_12 = ema(prices, 12);
+    const ema_26 = ema(prices, 26);
+
+    // MACD
+    const macd_line = ema_12 - ema_26;
+    // Signal line (9-period EMA of MACD) - approximate
+    const macdVals = [];
+    for (let i = 26; i < prices.length; i++) {
+      const e12 = ema(prices.slice(0, i + 1), 12);
+      const e26 = ema(prices.slice(0, i + 1), 26);
+      macdVals.push(e12 - e26);
+    }
+    const signal_line = macdVals.length >= 9 ? ema(macdVals, 9) : 0;
+
+    // Bollinger Bands (20-period, 2 std dev)
+    const bb_sma = sma_20;
+    const bb_slice = prices.slice(-20);
+    const bb_std = Math.sqrt(bb_slice.reduce((sum, p) => sum + Math.pow(p - bb_sma, 2), 0) / 20);
+    const bb_upper = bb_sma + 2 * bb_std;
+    const bb_lower = bb_sma - 2 * bb_std;
+
+    // Support/Resistance (simple: recent lows/highs)
+    const recent = prices.slice(-30);
+    const supports = [];
+    const resistances = [];
+    for (let i = 2; i < recent.length - 2; i++) {
+      if (recent[i] < recent[i-1] && recent[i] < recent[i-2] && recent[i] < recent[i+1] && recent[i] < recent[i+2]) {
+        supports.push(recent[i]);
+      }
+      if (recent[i] > recent[i-1] && recent[i] > recent[i-2] && recent[i] > recent[i+1] && recent[i] > recent[i+2]) {
+        resistances.push(recent[i]);
       }
     }
-    execSync(`python3 ${TOOLS_DIR}/technical-analysis.py ${coin} > /dev/null 2>&1`, { timeout: 20000 });
-    if (fs.existsSync(cachePath)) {
-      return res.json(JSON.parse(fs.readFileSync(cachePath, 'utf8')));
-    }
-    res.status(500).json({ error: 'TA failed' });
-  } catch (e) {
-    if (fs.existsSync(cachePath)) {
-      return res.json({ ...JSON.parse(fs.readFileSync(cachePath, 'utf8')), cached: true });
-    }
-    res.status(500).json({ error: 'TA unavailable' });
-  }
+
+    return {
+      price,
+      rsi,
+      sma_20,
+      sma_50,
+      ema_12,
+      ema_26,
+      macd_line,
+      signal_line,
+      bb_upper,
+      bb_lower,
+      bb_sma,
+      supports,
+      resistances,
+    };
+  });
+  return handler(req, res);
 });
 
 // Health check
@@ -522,8 +592,38 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', uptime: process.uptime(), cache: Object.keys(apiCache).length });
 });
 
+// Pre-warm cache on startup with staggered requests to avoid rate limits
+async function warmCache() {
+  const endpoints = [
+    '/api/fear-greed',
+    '/api/mining',
+    '/api/news',
+    '/api/lightning',
+    '/api/macro',
+    '/api/prices',
+    '/api/global',
+    '/api/chart/bitcoin/1',
+    '/api/ta/bitcoin',
+    '/api/x-posts',
+  ];
+  console.log('⏳ Warming cache...');
+  for (const ep of endpoints) {
+    try {
+      await fetch(`http://127.0.0.1:${PORT}${ep}`, { signal: AbortSignal.timeout(20000) });
+      console.log('  ✅ ' + ep);
+    } catch (e) {
+      console.log('  ⚠️ ' + ep + ' (' + (e.message || 'failed') + ')');
+    }
+    // Stagger to avoid rate limits (1.5s between CoinGecko calls)
+    await new Promise(r => setTimeout(r, 1500));
+  }
+  console.log('✅ Cache warm');
+}
+
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`₿ Bitcoin Intelligence Dashboard running on port ${PORT}`);
+  console.log(`₿ Difficulty Adjustment running on port ${PORT}`);
   if (AUTH_PASSWORD) console.log('🔒 Password protection enabled');
   else console.log('🔓 No password set (public access)');
+  // Warm cache after 3 seconds
+  setTimeout(warmCache, 3000);
 });

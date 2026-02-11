@@ -99,14 +99,21 @@ function cached(key, ttlMs, fetchFn) {
     if (apiCache[key] && (now - apiCache[key].ts) < ttlMs) {
       return res.json(apiCache[key].data);
     }
-    try {
-      const data = await fetchFn(req);
-      apiCache[key] = { data, ts: now };
-      res.json(data);
-    } catch (e) {
-      // Return stale cache if available
-      if (apiCache[key]) return res.json(apiCache[key].data);
-      res.status(500).json({ error: e.message });
+    // Try up to 2 times with a delay for rate limits
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const data = await fetchFn(req);
+        apiCache[key] = { data, ts: now };
+        return res.json(data);
+      } catch (e) {
+        if (attempt === 0 && e.message && e.message.includes('429')) {
+          await new Promise(r => setTimeout(r, 3000)); // wait 3s and retry
+          continue;
+        }
+        // Return stale cache if available
+        if (apiCache[key]) return res.json(apiCache[key].data);
+        return res.status(500).json({ error: e.message });
+      }
     }
   };
 }
@@ -594,28 +601,32 @@ app.get('/api/health', (req, res) => {
 
 // Pre-warm cache on startup with staggered requests to avoid rate limits
 async function warmCache() {
-  const endpoints = [
-    '/api/fear-greed',
-    '/api/mining',
-    '/api/news',
-    '/api/lightning',
-    '/api/macro',
-    '/api/prices',
-    '/api/global',
-    '/api/chart/bitcoin/1',
-    '/api/ta/bitcoin',
-    '/api/x-posts',
-  ];
-  console.log('⏳ Warming cache...');
-  for (const ep of endpoints) {
+  // Non-CoinGecko endpoints first (no rate limit concerns)
+  const safeFirst = ['/api/fear-greed', '/api/mining', '/api/news', '/api/lightning', '/api/x-posts'];
+  // CoinGecko endpoints — space these out heavily
+  const cgEndpoints = ['/api/macro', '/api/prices', '/api/global', '/api/chart/bitcoin/1', '/api/ta/bitcoin'];
+
+  console.log('⏳ Warming cache (safe endpoints)...');
+  for (const ep of safeFirst) {
     try {
       await fetch(`http://127.0.0.1:${PORT}${ep}`, { signal: AbortSignal.timeout(20000) });
       console.log('  ✅ ' + ep);
     } catch (e) {
       console.log('  ⚠️ ' + ep + ' (' + (e.message || 'failed') + ')');
     }
-    // Stagger to avoid rate limits (1.5s between CoinGecko calls)
-    await new Promise(r => setTimeout(r, 1500));
+    await new Promise(r => setTimeout(r, 500));
+  }
+
+  console.log('⏳ Warming CoinGecko endpoints (5s spacing)...');
+  for (const ep of cgEndpoints) {
+    try {
+      await fetch(`http://127.0.0.1:${PORT}${ep}`, { signal: AbortSignal.timeout(20000) });
+      console.log('  ✅ ' + ep);
+    } catch (e) {
+      console.log('  ⚠️ ' + ep + ' (' + (e.message || 'failed') + ')');
+    }
+    // 5 second gap between CoinGecko calls
+    await new Promise(r => setTimeout(r, 5000));
   }
   console.log('✅ Cache warm');
 }

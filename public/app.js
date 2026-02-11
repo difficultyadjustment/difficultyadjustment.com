@@ -205,7 +205,7 @@ function renderBTCHero(btc) {
   fmt.change(document.getElementById('btcChange'), btc.price_change_percentage_24h);
 
   // Dynamic page title with price
-  document.title = fmt.price(btc.current_price) + ' — Bitcoin Intelligence Dashboard';
+  document.title = fmt.price(btc.current_price) + ' — Difficulty Adjustment';
 
   // Sats per unit of currency
   var satsPerUnit = Math.round(100000000 / btc.current_price);
@@ -1188,6 +1188,16 @@ document.addEventListener('click', function(e) {
 
 // Apply saved visibility on load
 applySectionVisibility();
+
+// ===== NAVIGATION =====
+
+function scrollToSection(name) {
+  var el = document.querySelector('[data-section="' + name + '"]');
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  return false;
+}
 
 // ===== CURRENCY =====
 

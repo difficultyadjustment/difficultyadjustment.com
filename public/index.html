@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>₿ Bitcoin Intelligence Dashboard</title>
+  <title>₿ Difficulty Adjustment — Bitcoin Intelligence</title>
   <meta name="description" content="Real-time Bitcoin intelligence — price charts, technical analysis, mining stats, difficulty adjustments, and curated news. difficultyadjustment.com">
   <meta property="og:title" content="Difficulty Adjustment — Bitcoin Intelligence">
   <meta property="og:description" content="Real-time Bitcoin intelligence — charts, TA, mining, difficulty, Fear & Greed. There is no second best.">
@@ -22,13 +22,18 @@
     <header class="header">
       <div class="header-left">
         <span class="logo">₿</span>
-        <h1>Bitcoin<span class="accent">Intel</span></h1>
-        <span class="tagline">Bitcoin Intelligence Dashboard</span>
+        <h1>Difficulty<span class="accent">Adjustment</span></h1>
       </div>
+      <nav class="site-nav">
+        <a href="/" class="nav-link active">Dashboard</a>
+        <a href="#difficulty" class="nav-link" onclick="scrollToSection('mining')">Difficulty</a>
+        <a href="#macro" class="nav-link" onclick="scrollToSection('macro')">Macro</a>
+        <a href="#news" class="nav-link" onclick="scrollToSection('news')">News</a>
+      </nav>
       <div class="header-right">
         <div class="live-dot"></div>
         <span class="last-update" id="lastUpdate">Loading...</span>
-        <button class="refresh-btn" onclick="refreshAll()">↻ Refresh</button>
+        <button class="refresh-btn" onclick="refreshAll()">↻</button>
         <select class="currency-select" id="currencySelect" onchange="changeCurrency(this.value)">
           <option value="usd">USD $</option>
           <option value="cad">CAD $</option>
@@ -113,6 +118,35 @@
       </div>
     </div>
 
+    <!-- Mining & Difficulty Section — Hero (namesake of the site) -->
+    <div class="mining-section section-panel" data-section="mining">
+      <div class="card mining-card diff-hero-card">
+        <div class="card-header">
+          <h3>⛏️ Difficulty Adjustment</h3>
+          <span class="badge" id="diffBadge">--</span>
+        </div>
+        <div class="diff-content" id="diffContent">
+          <div class="ta-loading">Loading mining data...</div>
+        </div>
+      </div>
+      <div class="card mining-card">
+        <div class="card-header">
+          <h3>🔥 Hashrate</h3>
+        </div>
+        <div class="chart-tabs mini-tabs">
+          <button class="tab mini active" onclick="loadMining('3m', this)">3M</button>
+          <button class="tab mini" onclick="loadMining('6m', this)">6M</button>
+          <button class="tab mini" onclick="loadMining('1y', this)">1Y</button>
+          <button class="tab mini" onclick="loadMining('2y', this)">2Y</button>
+          <button class="tab mini" onclick="loadMining('3y', this)">3Y</button>
+        </div>
+        <div class="hashrate-chart-wrapper">
+          <canvas id="hashrateChart" height="180"></canvas>
+        </div>
+        <div class="hashrate-stats" id="hashrateStats"></div>
+      </div>
+    </div>
+
     <!-- Main Grid -->
     <div class="main-grid">
       <!-- BTC Hero Card -->
@@ -155,35 +189,6 @@
         <div class="ta-content" id="taContent">
           <div class="ta-loading">Running TA...</div>
         </div>
-      </div>
-    </div>
-
-    <!-- Mining & Difficulty Section -->
-    <div class="mining-section section-panel" data-section="mining">
-      <div class="card mining-card">
-        <div class="card-header">
-          <h3>⛏️ Difficulty Adjustment</h3>
-          <span class="badge" id="diffBadge">--</span>
-        </div>
-        <div class="diff-content" id="diffContent">
-          <div class="ta-loading">Loading mining data...</div>
-        </div>
-      </div>
-      <div class="card mining-card">
-        <div class="card-header">
-          <h3>🔥 Hashrate</h3>
-        </div>
-        <div class="chart-tabs mini-tabs">
-          <button class="tab mini active" onclick="loadMining('3m', this)">3M</button>
-          <button class="tab mini" onclick="loadMining('6m', this)">6M</button>
-          <button class="tab mini" onclick="loadMining('1y', this)">1Y</button>
-          <button class="tab mini" onclick="loadMining('2y', this)">2Y</button>
-          <button class="tab mini" onclick="loadMining('3y', this)">3Y</button>
-        </div>
-        <div class="hashrate-chart-wrapper">
-          <canvas id="hashrateChart" height="180"></canvas>
-        </div>
-        <div class="hashrate-stats" id="hashrateStats"></div>
       </div>
     </div>
 

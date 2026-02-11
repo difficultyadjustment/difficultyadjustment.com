@@ -393,16 +393,19 @@ function renderFearGreed(data) {
 }
 
 function renderGlobal(data) {
-  // BTC market cap (from total * dominance)
-  const btcDom = (data.market_cap_percentage?.btc || 0) / 100;
-  const btcMcapVal = (data.total_market_cap?.usd || 0) * btcDom;
+  // BTC market cap (from total * dominance), currency-aware
+  var cur = currentCurrency === 'sats' ? 'usd' : currentCurrency;
+  var btcDom = (data.market_cap_percentage?.btc || 0) / 100;
+  var totalMcap = (data.total_market_cap?.[cur] || data.total_market_cap?.usd || 0);
+  var btcMcapVal = totalMcap * btcDom;
   document.getElementById('btcMcap').textContent = fmt.mcap(btcMcapVal);
-  document.getElementById('totalVol').textContent = fmt.vol(data.total_volume?.usd || 0);
+  var totalVol = (data.total_volume?.[cur] || data.total_volume?.usd || 0);
+  document.getElementById('totalVol').textContent = fmt.vol(totalVol);
   document.getElementById('btcDom').textContent = (data.market_cap_percentage?.btc || 0).toFixed(1) + '%';
 
   // 24h market cap delta
-  const mcap24h = data.market_cap_change_percentage_24h_usd || 0;
-  const deltaEl = document.getElementById('mcap24hDelta');
+  var mcap24h = data.market_cap_change_percentage_24h_usd || 0;
+  var deltaEl = document.getElementById('mcap24hDelta');
   deltaEl.textContent = fmt.pct(mcap24h);
   deltaEl.className = 'stat-value ' + (mcap24h >= 0 ? 'positive' : 'negative');
 }

@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>₿ Difficulty History — Every Adjustment Since Genesis</title>
+  <meta name="description" content="Complete history of all 450+ Bitcoin difficulty adjustments since the genesis block. Interactive chart and data explorer.">
+  <meta property="og:title" content="Bitcoin Difficulty History — difficultyadjustment.com">
+  <meta property="og:description" content="Every Bitcoin difficulty adjustment since January 3, 2009. Interactive visualization.">
+  <meta name="theme-color" content="#f7931a">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>₿</text></svg>">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    /* History-specific styles */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 20px;
+      text-align: center;
+    }
+
+    .stat-card .label {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+
+    .stat-card .value {
+      font-size: 24px;
+      font-weight: 800;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--accent);
+    }
+
+    .stat-card .sub {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+
+    /* Chart Section */
+    .chart-section {
+      margin-bottom: 32px;
+    }
+
+    .chart-section .chart-wrapper {
+      height: 400px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+    }
+
+    .chart-tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 16px;
+    }
+
+    .tab {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 6px 16px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+
+    .tab:hover { color: var(--text-primary); border-color: var(--border-light); }
+    .tab.active { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 700; }
+
+    /* Table */
+    .table-section {
+      margin-bottom: 32px;
+    }
+
+    .table-controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .table-search {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      padding: 8px 16px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      width: 240px;
+      outline: none;
+    }
+
+    .table-search:focus { border-color: var(--accent); }
+
+    .table-search::placeholder { color: var(--text-muted); }
+
+    .history-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--bg-card);
+      border-radius: var(--radius);
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .history-table th {
+      text-align: left;
+      padding: 14px 16px;
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      border-bottom: 2px solid var(--border);
+      background: var(--bg-secondary);
+      cursor: pointer;
+      user-select: none;
+      transition: color 0.2s;
+    }
+
+    .history-table th:hover { color: var(--accent); }
+    .history-table th.sorted { color: var(--accent); }
+
+    .history-table td {
+      padding: 12px 16px;
+      font-size: 13px;
+      border-bottom: 1px solid var(--border);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .history-table tr:hover { background: var(--bg-card-hover); }
+
+    .history-table .positive { color: var(--green); }
+    .history-table .negative { color: var(--red); }
+
+    .change-bar {
+      display: inline-block;
+      height: 6px;
+      border-radius: 3px;
+      vertical-align: middle;
+      margin-right: 8px;
+      min-width: 2px;
+    }
+
+    .epoch-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: 'Inter', sans-serif;
+    }
+
+    /* Pagination */
+    .pagination {
+      display: flex;
+      justify-content: center;
+      gap: 4px;
+      margin-top: 20px;
+    }
+
+    .pagination button {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      padding: 6px 12px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.2s;
+    }
+
+    .pagination button:hover { border-color: var(--accent); color: var(--accent); }
+    .pagination button.active { background: var(--accent); border-color: var(--accent); color: #000; }
+    .pagination button:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    /* Notable events */
+    .event-marker {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 600;
+      font-family: 'Inter', sans-serif;
+    }
+
+    .event-halving { background: var(--accent-dim); color: var(--accent); }
+    .event-record { background: rgba(168, 85, 247, 0.15); color: var(--purple); }
+
+    @media (max-width: 1024px) {
+      .stats-row { grid-template-columns: repeat(3, 1fr); }
+    }
+
+    @media (max-width: 640px) {
+      .stats-row { grid-template-columns: repeat(2, 1fr); }
+      .chart-section .chart-wrapper { height: 280px; }
+      .history-table { font-size: 12px; }
+      .history-table td, .history-table th { padding: 8px 10px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="header-left">
+        <a href="/">
+          <span class="logo">₿</span>
+          <h1>Difficulty<span class="accent">Adjustment</span></h1>
+        </a>
+      </div>
+      <nav class="site-nav">
+        <a href="/" class="nav-link">Dashboard</a>
+        <a href="/history" class="nav-link active">History</a>
+        <a href="/calculator" class="nav-link">Calculator</a>
+      </nav>
+      <div class="header-right"></div>
+    </header>
+
+    <div class="page-hero">
+      <h2>Every <span class="accent">Difficulty Adjustment</span> Since Genesis</h2>
+      <p class="subtitle">A complete record of Bitcoin's self-regulating heartbeat — all 450+ adjustments from block 0 to today.</p>
+    </div>
+
+    <!-- Summary Stats -->
+    <div class="stats-row" id="statsRow">
+      <div class="stat-card">
+        <div class="label">Total Adjustments</div>
+        <div class="value" id="totalAdj">--</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Largest Increase</div>
+        <div class="value positive" id="maxIncrease">--</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Largest Decrease</div>
+        <div class="value negative" id="maxDecrease">--</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Current Difficulty</div>
+        <div class="value" id="currentDiff">--</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Average Change</div>
+        <div class="value" id="avgChange">--</div>
+      </div>
+    </div>
+
+    <!-- Difficulty Chart -->
+    <div class="chart-section">
+      <div class="card-header">
+        <h3>📈 Difficulty Over Time</h3>
+        <div class="chart-tabs">
+          <button class="tab" onclick="setChartRange('1y', this)">1Y</button>
+          <button class="tab" onclick="setChartRange('3y', this)">3Y</button>
+          <button class="tab" onclick="setChartRange('5y', this)">5Y</button>
+          <button class="tab active" onclick="setChartRange('all', this)">ALL</button>
+        </div>
+      </div>
+      <div class="chart-wrapper">
+        <canvas id="diffChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Change Chart -->
+    <div class="chart-section">
+      <div class="card-header">
+        <h3>📊 Adjustment Changes (%)</h3>
+      </div>
+      <div class="chart-wrapper">
+        <canvas id="changeChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Data Table -->
+    <div class="table-section">
+      <div class="table-controls">
+        <h3>📋 All Adjustments</h3>
+        <input type="text" class="table-search" id="tableSearch" placeholder="Search by block height..." oninput="filterTable(this.value)">
+      </div>
+      <div style="overflow-x: auto;">
+        <table class="history-table" id="historyTable">
+          <thead>
+            <tr>
+              <th onclick="sortTable('idx')">#</th>
+              <th onclick="sortTable('date')">Date</th>
+              <th onclick="sortTable('height')">Block Height</th>
+              <th onclick="sortTable('difficulty')">Difficulty</th>
+              <th onclick="sortTable('change')" class="sorted">Change</th>
+              <th>Epoch</th>
+              <th>Notable</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+      <div class="pagination" id="pagination"></div>
+    </div>
+
+    <footer class="footer">
+      <span>₿ difficultyadjustment.com • Every adjustment. Every block. Since 2009. • Data: mempool.space</span>
+    </footer>
+  </div>
+
+  <script>
+    var allData = [];
+    var currentPage = 1;
+    var perPage = 50;
+    var sortKey = 'idx';
+    var sortAsc = false;
+    var diffChart = null;
+    var changeChart = null;
+    var chartRange = 'all';
+
+    // Halving blocks for markers
+    var halvingBlocks = [0, 210000, 420000, 630000, 840000];
+    var halvingDates = {
+      0: 'Genesis',
+      210000: 'Halving #1',
+      420000: 'Halving #2',
+      630000: 'Halving #3',
+      840000: 'Halving #4',
+    };
+
+    async function loadData() {
+      var resp = await fetch('/api/difficulty-history');
+      allData = await resp.json();
+      if (allData.length) {
+        renderStats();
+        renderDiffChart();
+        renderChangeChart();
+        renderTable();
+      }
+    }
+
+    function renderStats() {
+      document.getElementById('totalAdj').textContent = allData.length;
+
+      var changes = allData.map(function(d) { return d.changePct; }).filter(function(c) { return isFinite(c); });
+      var max = Math.max.apply(null, changes);
+      var min = Math.min.apply(null, changes);
+      var avg = changes.reduce(function(a, b) { return a + b; }, 0) / changes.length;
+
+      document.getElementById('maxIncrease').textContent = '+' + max.toFixed(1) + '%';
+      document.getElementById('maxDecrease').textContent = min.toFixed(1) + '%';
+      document.getElementById('avgChange').textContent = (avg >= 0 ? '+' : '') + avg.toFixed(2) + '%';
+
+      var latest = allData[0];
+      var diffT = latest.difficulty / 1e12;
+      document.getElementById('currentDiff').textContent = diffT.toFixed(1) + 'T';
+    }
+
+    function getFilteredByRange(range) {
+      if (range === 'all') return allData;
+      var now = Date.now();
+      var ms = { '1y': 365*86400000, '3y': 3*365*86400000, '5y': 5*365*86400000 };
+      var cutoff = now - (ms[range] || 0);
+      return allData.filter(function(d) { return d.timestamp >= cutoff; });
+    }
+
+    function renderDiffChart() {
+      var data = getFilteredByRange(chartRange);
+      var ctx = document.getElementById('diffChart').getContext('2d');
+
+      if (diffChart) diffChart.destroy();
+
+      var labels = data.map(function(d) { return new Date(d.timestamp); }).reverse();
+      var values = data.map(function(d) { return d.difficulty / 1e12; }).reverse();
+
+      diffChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            data: values,
+            borderColor: '#f7931a',
+            borderWidth: 2,
+            backgroundColor: function(context) {
+              var c = context.chart.ctx;
+              var g = c.createLinearGradient(0, 0, 0, 400);
+              g.addColorStop(0, 'rgba(247,147,26,0.3)');
+              g.addColorStop(1, 'rgba(247,147,26,0)');
+              return g;
+            },
+            fill: true,
+            tension: 0.2,
+            pointRadius: 0,
+            pointHitRadius: 8,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          scales: {
+            x: {
+              type: 'time',
+              grid: { display: false },
+              ticks: { maxTicksLimit: 10, font: { size: 11 } }
+            },
+            y: {
+              type: chartRange === 'all' ? 'logarithmic' : 'linear',
+              grid: { color: '#25253020' },
+              ticks: {
+                callback: function(v) { return v >= 1 ? v.toFixed(0) + 'T' : (v * 1000).toFixed(0) + 'G'; },
+                font: { size: 11, family: "'JetBrains Mono', monospace" }
+              }
+            }
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#16161f',
+              borderColor: '#252530',
+              borderWidth: 1,
+              callbacks: {
+                label: function(ctx) { return 'Difficulty: ' + ctx.parsed.y.toFixed(2) + 'T'; }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function renderChangeChart() {
+      var data = getFilteredByRange(chartRange);
+      var ctx = document.getElementById('changeChart').getContext('2d');
+
+      if (changeChart) changeChart.destroy();
+
+      var labels = data.map(function(d) { return new Date(d.timestamp); }).reverse();
+      var values = data.map(function(d) { return d.changePct; }).reverse();
+      var colors = values.map(function(v) { return v >= 0 ? '#22c55e' : '#ef4444'; });
+
+      changeChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            data: values,
+            backgroundColor: colors,
+            borderRadius: 2,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          scales: {
+            x: {
+              type: 'time',
+              grid: { display: false },
+              ticks: { maxTicksLimit: 10, font: { size: 11 } }
+            },
+            y: {
+              grid: { color: '#25253020' },
+              ticks: {
+                callback: function(v) { return v.toFixed(0) + '%'; },
+                font: { size: 11, family: "'JetBrains Mono', monospace" }
+              }
+            }
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#16161f',
+              callbacks: {
+                label: function(ctx) { return (ctx.parsed.y >= 0 ? '+' : '') + ctx.parsed.y.toFixed(2) + '%'; }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function setChartRange(range, btn) {
+      chartRange = range;
+      if (btn) {
+        btn.parentElement.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+        btn.classList.add('active');
+      }
+      renderDiffChart();
+      renderChangeChart();
+    }
+
+    function formatDifficulty(d) {
+      if (d >= 1e12) return (d / 1e12).toFixed(2) + ' T';
+      if (d >= 1e9) return (d / 1e9).toFixed(2) + ' G';
+      if (d >= 1e6) return (d / 1e6).toFixed(2) + ' M';
+      if (d >= 1e3) return (d / 1e3).toFixed(2) + ' K';
+      return d.toFixed(0);
+    }
+
+    function getEpoch(height) {
+      return Math.floor(height / 2016);
+    }
+
+    function getNotable(d) {
+      var tags = [];
+      // Check if near a halving
+      for (var i = 0; i < halvingBlocks.length; i++) {
+        if (Math.abs(d.height - halvingBlocks[i]) <= 2016) {
+          tags.push('<span class="event-marker event-halving">' + halvingDates[halvingBlocks[i]] + '</span>');
+        }
+      }
+      // Record highs
+      if (d.changePct > 50) tags.push('<span class="event-marker event-record">Huge ↑</span>');
+      if (d.changePct < -25) tags.push('<span class="event-marker event-record">Big ↓</span>');
+      return tags.join(' ');
+    }
+
+    function renderTable() {
+      var data = allData.slice();
+
+      // Add index
+      data.forEach(function(d, i) { d.idx = i + 1; });
+
+      // Sort
+      data.sort(function(a, b) {
+        var va, vb;
+        if (sortKey === 'idx') { va = a.idx; vb = b.idx; }
+        else if (sortKey === 'date') { va = a.timestamp; vb = b.timestamp; }
+        else if (sortKey === 'height') { va = a.height; vb = b.height; }
+        else if (sortKey === 'difficulty') { va = a.difficulty; vb = b.difficulty; }
+        else if (sortKey === 'change') { va = a.changePct; vb = b.changePct; }
+        else { va = a.idx; vb = b.idx; }
+        return sortAsc ? va - vb : vb - va;
+      });
+
+      // Filter
+      var search = (document.getElementById('tableSearch').value || '').trim();
+      if (search) {
+        data = data.filter(function(d) {
+          return String(d.height).includes(search) || new Date(d.timestamp).toLocaleDateString().includes(search);
+        });
+      }
+
+      // Paginate
+      var total = data.length;
+      var pages = Math.ceil(total / perPage);
+      if (currentPage > pages) currentPage = pages;
+      if (currentPage < 1) currentPage = 1;
+      var start = (currentPage - 1) * perPage;
+      var pageData = data.slice(start, start + perPage);
+
+      var tbody = document.getElementById('tableBody');
+      tbody.innerHTML = pageData.map(function(d) {
+        var date = new Date(d.timestamp);
+        var dateStr = date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+        var changeCls = d.changePct >= 0 ? 'positive' : 'negative';
+        var barWidth = Math.min(60, Math.abs(d.changePct) * 2);
+        var barColor = d.changePct >= 0 ? '#22c55e' : '#ef4444';
+        var changeStr = (d.changePct >= 0 ? '+' : '') + d.changePct.toFixed(2) + '%';
+
+        return '<tr>' +
+          '<td>' + d.idx + '</td>' +
+          '<td>' + dateStr + '</td>' +
+          '<td>' + d.height.toLocaleString() + '</td>' +
+          '<td>' + formatDifficulty(d.difficulty) + '</td>' +
+          '<td class="' + changeCls + '"><span class="change-bar" style="width:' + barWidth + 'px;background:' + barColor + '"></span>' + changeStr + '</td>' +
+          '<td><span class="epoch-label">Epoch ' + getEpoch(d.height) + '</span></td>' +
+          '<td>' + getNotable(d) + '</td>' +
+        '</tr>';
+      }).join('');
+
+      // Pagination
+      var pagDiv = document.getElementById('pagination');
+      if (pages <= 1) { pagDiv.innerHTML = ''; return; }
+      var btns = '';
+      btns += '<button ' + (currentPage <= 1 ? 'disabled' : '') + ' onclick="goPage(' + (currentPage - 1) + ')">‹</button>';
+      for (var p = 1; p <= pages; p++) {
+        if (p === 1 || p === pages || Math.abs(p - currentPage) <= 2) {
+          btns += '<button class="' + (p === currentPage ? 'active' : '') + '" onclick="goPage(' + p + ')">' + p + '</button>';
+        } else if (Math.abs(p - currentPage) === 3) {
+          btns += '<button disabled>…</button>';
+        }
+      }
+      btns += '<button ' + (currentPage >= pages ? 'disabled' : '') + ' onclick="goPage(' + (currentPage + 1) + ')">›</button>';
+      pagDiv.innerHTML = btns;
+    }
+
+    function sortTable(key) {
+      if (sortKey === key) sortAsc = !sortAsc;
+      else { sortKey = key; sortAsc = false; }
+
+      // Update header styles
+      document.querySelectorAll('.history-table th').forEach(function(th) { th.classList.remove('sorted'); });
+      event.target.classList.add('sorted');
+
+      currentPage = 1;
+      renderTable();
+    }
+
+    function filterTable(val) {
+      currentPage = 1;
+      renderTable();
+    }
+
+    function goPage(p) {
+      currentPage = p;
+      renderTable();
+      document.querySelector('.table-section').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // Load
+    loadData();
+  </script>
+</body>
+</html>

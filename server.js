@@ -87,7 +87,17 @@ ${error ? '<p class="err">' + error + '</p>' : ''}
 <button type="submit">Enter</button></form></div></body></html>`;
 }
 
+// Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Page routes
+app.get('/history', (req, res) => {
+  res.sendFile('history.html', { root: path.join(__dirname, 'public') });
+});
+
+app.get('/calculator', (req, res) => {
+  res.sendFile('calculator.html', { root: path.join(__dirname, 'public') });
+});
 
 // ===== API ROUTES =====
 
@@ -593,6 +603,26 @@ app.get('/api/ta/:coin', async (req, res) => {
   });
   return handler(req, res);
 });
+
+// Historical difficulty adjustments — cache 1 hour
+app.get('/api/difficulty-history', cached('diff-history', 3600000, async () => {
+  const resp = await fetch('https://mempool.space/api/v1/mining/difficulty-adjustments/all', {
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!resp.ok) throw new Error('Mempool ' + resp.status);
+  const raw = await resp.json();
+  // Format: [[timestamp, height, difficulty, change_ratio], ...]
+  return raw.map((d, i) => {
+    const prevDiff = i < raw.length - 1 ? raw[i + 1][2] : d[2];
+    const changePct = prevDiff > 0 ? ((d[2] - prevDiff) / prevDiff * 100) : 0;
+    return {
+      timestamp: d[0] * 1000,
+      height: d[1],
+      difficulty: d[2],
+      changePct: changePct,
+    };
+  });
+}));
 
 // Health check
 app.get('/api/health', (req, res) => {

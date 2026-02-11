@@ -42,6 +42,9 @@
       <label class="settings-toggle"><input type="checkbox" data-section="ta" checked onchange="toggleSection(this)"> Technical Analysis</label>
       <label class="settings-toggle"><input type="checkbox" data-section="mining" checked onchange="toggleSection(this)"> Mining & Difficulty</label>
       <label class="settings-toggle"><input type="checkbox" data-section="macro" checked onchange="toggleSection(this)"> Macro Environment</label>
+      <label class="settings-toggle"><input type="checkbox" data-section="btc-gold" checked onchange="toggleSection(this)"> Bitcoin vs Gold</label>
+      <label class="settings-toggle"><input type="checkbox" data-section="cycle" checked onchange="toggleSection(this)"> Halving Cycle</label>
+      <label class="settings-toggle"><input type="checkbox" data-section="lightning" checked onchange="toggleSection(this)"> Lightning Network</label>
       <label class="settings-toggle"><input type="checkbox" data-section="news" checked onchange="toggleSection(this)"> Bitcoin News & X</label>
       <label class="settings-toggle"><input type="checkbox" data-section="vitals" checked onchange="toggleSection(this)"> Bitcoin Vitals</label>
       <label class="settings-toggle"><input type="checkbox" data-section="shitcoins" checked onchange="toggleSection(this)"> Shitcoin Index</label>
@@ -112,7 +115,9 @@
           <button class="tab" onclick="loadChart('bitcoin', 30, this)">30D</button>
           <button class="tab" onclick="loadChart('bitcoin', 90, this)">90D</button>
           <button class="tab" onclick="loadChart('bitcoin', 365, this)">1Y</button>
-          <button class="tab" onclick="loadChart('bitcoin', 'max', this)">ALL</button>
+          <button class="tab" onclick="loadChartLong('2y', this)">2Y</button>
+          <button class="tab" onclick="loadChartLong('5y', this)">5Y</button>
+          <button class="tab" onclick="loadChartLong('max', this)">ALL</button>
         </div>
         <div class="chart-wrapper">
           <canvas id="btcChart"></canvas>
@@ -164,6 +169,41 @@
         <div class="macro-grid" id="macroGrid">
           <div class="ta-loading">Loading macro data...</div>
         </div>
+      </div>
+    </div>
+
+    <!-- Bitcoin Metrics Row -->
+    <div class="metrics-section">
+      <!-- BTC/Gold Ratio -->
+      <div class="card section-panel" data-section="btc-gold">
+        <div class="card-header">
+          <h3>🥇 Bitcoin vs Gold</h3>
+          <span class="badge" id="btcGoldBadge">--</span>
+        </div>
+        <div class="btc-gold-value" id="btcGoldValue">-- oz</div>
+        <div class="btc-gold-context">1 BTC buys this many ounces of gold</div>
+        <div class="metric-chart-wrapper"><canvas id="btcGoldChart" height="150"></canvas></div>
+      </div>
+
+      <!-- Halving Cycle -->
+      <div class="card section-panel" data-section="cycle">
+        <div class="card-header">
+          <h3>🔄 Halving Cycle</h3>
+        </div>
+        <div class="cycle-content" id="cycleContent">
+          <div class="ta-loading">Loading...</div>
+        </div>
+      </div>
+
+      <!-- Lightning Network -->
+      <div class="card section-panel" data-section="lightning">
+        <div class="card-header">
+          <h3>⚡ Lightning Network</h3>
+        </div>
+        <div class="lightning-content" id="lightningContent">
+          <div class="ta-loading">Loading...</div>
+        </div>
+        <div class="metric-chart-wrapper"><canvas id="lnCapChart" height="120"></canvas></div>
       </div>
     </div>
 

@@ -105,6 +105,12 @@ async function fetchMacro() {
   if (data && typeof data === 'object') renderMacro(data);
 }
 
+async function fetchLightning() {
+  var res = await fetch('/api/lightning');
+  var data = await res.json();
+  if (data.channels) renderLightning(data);
+}
+
 async function fetchXPosts() {
   const res = await fetch('/api/x-posts');
   const data = await res.json();
@@ -119,6 +125,16 @@ async function loadChart(coin, days, btn) {
   const res = await fetch('/api/chart/' + coin + '/' + days);
   const data = await res.json();
   if (data.prices) renderBTCChart(data.prices, days);
+}
+
+async function loadChartLong(range, btn) {
+  if (btn) {
+    document.querySelectorAll('.chart-tabs .tab').forEach(function(t) { t.classList.remove('active'); });
+    btn.classList.add('active');
+  }
+  var res = await fetch('/api/chart-long/' + range);
+  var data = await res.json();
+  if (data.prices) renderBTCChart(data.prices, range);
 }
 
 // ===== RENDER FUNCTIONS =====
@@ -136,18 +152,30 @@ function renderBTCHero(btc) {
   const satsEl = document.getElementById('satsPerDollar');
   if (satsEl) satsEl.textContent = satsPerDollar.toLocaleString();
 
-  const stats = document.getElementById('btcStats');
+  // Days since ATH
+  var daysSinceATH = '--';
+  if (btc.ath_date) {
+    var athDate = new Date(btc.ath_date);
+    daysSinceATH = Math.floor((Date.now() - athDate.getTime()) / 86400000) + 'd';
+  }
+
+  var stats = document.getElementById('btcStats');
   stats.innerHTML = [
     { label: '24h High', value: fmt.price(btc.high_24h) },
     { label: '24h Low', value: fmt.price(btc.low_24h) },
     { label: 'ATH', value: fmt.price(btc.ath) },
     { label: 'From ATH', value: fmt.pct(btc.ath_change_percentage) },
-  ].map(i => `
-    <div class="btc-stat-item">
-      <div class="label">${i.label}</div>
-      <div class="value">${i.value}</div>
-    </div>
-  `).join('');
+    { label: 'Days Since ATH', value: daysSinceATH },
+    { label: 'ATH Date', value: btc.ath_date ? new Date(btc.ath_date).toLocaleDateString() : '--' },
+  ].map(function(i) {
+    return '<div class="btc-stat-item">' +
+      '<div class="label">' + i.label + '</div>' +
+      '<div class="value">' + i.value + '</div>' +
+    '</div>';
+  }).join('');
+
+  // Render BTC/Gold ratio if gold data is cached
+  renderBtcGold(btc);
 }
 
 function renderVitals(btc) {
@@ -696,6 +724,192 @@ function renderXPosts(posts) {
   }).join('');
 }
 
+// ===== BTC / GOLD RATIO =====
+
+var btcGoldChart = null;
+var cachedGoldPrice = null;
+
+function renderBtcGold(btc) {
+  // Need gold price from macro data
+  if (!cachedGoldPrice || !btc) return;
+  var ratio = btc.current_price / cachedGoldPrice;
+  document.getElementById('btcGoldValue').textContent = ratio.toFixed(1) + ' oz';
+
+  var badge = document.getElementById('btcGoldBadge');
+  badge.textContent = ratio.toFixed(1) + ' oz/BTC';
+  badge.className = 'badge bullish';
+}
+
+function renderBtcGoldChart(goldSparkline) {
+  if (!goldSparkline || goldSparkline.length < 2 || !btcPriceGlobal) return;
+  // We can only show the gold sparkline since we don't have synced BTC data
+  // Instead, just show gold price trend
+  var el = document.getElementById('btcGoldChart');
+  if (!el) return;
+  var ctx = el.getContext('2d');
+
+  if (btcGoldChart) btcGoldChart.destroy();
+
+  var vals = goldSparkline;
+  btcGoldChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: vals.map(function(_, i) { return i; }),
+      datasets: [{
+        label: 'Gold Price (30d)',
+        data: vals,
+        borderColor: '#FFD700',
+        borderWidth: 2,
+        backgroundColor: 'rgba(255, 215, 0, 0.1)',
+        fill: true,
+        tension: 0.4,
+        pointRadius: 0,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: { x: { display: false }, y: { display: false } },
+      plugins: {
+        tooltip: {
+          callbacks: { label: function(ctx) { return '$' + ctx.parsed.y.toFixed(0); } }
+        }
+      }
+    }
+  });
+}
+
+// ===== HALVING CYCLE =====
+
+function renderCycle() {
+  var container = document.getElementById('cycleContent');
+
+  // Halving dates (block heights)
+  var halvings = [
+    { date: new Date('2012-11-28'), block: 210000, reward: 25 },
+    { date: new Date('2016-07-09'), block: 420000, reward: 12.5 },
+    { date: new Date('2020-05-11'), block: 630000, reward: 6.25 },
+    { date: new Date('2024-04-20'), block: 840000, reward: 3.125 },
+  ];
+  var nextHalving = { date: new Date('2028-04-01'), block: 1050000, reward: 1.5625 }; // estimated
+
+  var lastHalving = halvings[halvings.length - 1];
+  var now = new Date();
+
+  // Days since last halving
+  var daysSinceLast = Math.floor((now - lastHalving.date) / 86400000);
+
+  // Estimated days until next
+  var daysUntilNext = Math.floor((nextHalving.date - now) / 86400000);
+
+  // Total cycle length (approx 4 years = 1461 days)
+  var cycleLength = Math.floor((nextHalving.date - lastHalving.date) / 86400000);
+  var cyclePct = Math.min(100, (daysSinceLast / cycleLength * 100)).toFixed(1);
+
+  // Determine phase
+  var phase, phaseClass;
+  var pctNum = parseFloat(cyclePct);
+  if (pctNum < 25) { phase = 'Accumulation'; phaseClass = 'accumulation'; }
+  else if (pctNum < 55) { phase = 'Expansion'; phaseClass = 'expansion'; }
+  else if (pctNum < 75) { phase = 'Distribution'; phaseClass = 'distribution'; }
+  else { phase = 'Markdown'; phaseClass = 'markdown'; }
+
+  // Gradient for cycle bar
+  var gradient = 'linear-gradient(90deg, #22c55e 0%, #f7931a 40%, #ef4444 70%, #a855f7 100%)';
+
+  container.innerHTML =
+    '<div class="cycle-progress-wrapper">' +
+      '<div class="cycle-bar-outer">' +
+        '<div class="cycle-bar-fill" style="width:' + cyclePct + '%;background:' + gradient + '"></div>' +
+      '</div>' +
+      '<div class="cycle-bar-labels">' +
+        '<span>Halving #4</span>' +
+        '<span>' + cyclePct + '%</span>' +
+        '<span>Halving #5</span>' +
+      '</div>' +
+    '</div>' +
+    '<div class="cycle-stats">' +
+      '<div class="cycle-row"><span class="cycle-label">Current Phase</span><span class="cycle-val"><span class="cycle-phase ' + phaseClass + '">' + phase + '</span></span></div>' +
+      '<div class="cycle-row"><span class="cycle-label">Days Since Halving</span><span class="cycle-val">' + daysSinceLast.toLocaleString() + '</span></div>' +
+      '<div class="cycle-row"><span class="cycle-label">Days Until Next</span><span class="cycle-val">' + daysUntilNext.toLocaleString() + '</span></div>' +
+      '<div class="cycle-row"><span class="cycle-label">Current Reward</span><span class="cycle-val">3.125 BTC</span></div>' +
+      '<div class="cycle-row"><span class="cycle-label">Next Reward</span><span class="cycle-val">1.5625 BTC</span></div>' +
+      '<div class="cycle-row"><span class="cycle-label">Cycle #</span><span class="cycle-val">5 of ∞</span></div>' +
+    '</div>';
+}
+
+// ===== LIGHTNING NETWORK =====
+
+var lnCapChart = null;
+
+function renderLightning(data) {
+  var container = document.getElementById('lightningContent');
+
+  container.innerHTML =
+    '<div class="ln-hero">' +
+      '<div class="ln-stat-big"><div class="label">Capacity</div><div class="value">' +
+        (data.capacityBtc ? data.capacityBtc.toLocaleString(undefined, {maximumFractionDigits: 0}) + ' BTC' : '--') + '</div></div>' +
+      '<div class="ln-stat-big"><div class="label">Channels</div><div class="value">' +
+        (data.channels ? data.channels.toLocaleString() : '--') + '</div></div>' +
+      '<div class="ln-stat-big"><div class="label">Nodes</div><div class="value">' +
+        (data.nodes ? data.nodes.toLocaleString() : '--') + '</div></div>' +
+    '</div>' +
+    [
+      { label: 'Tor Nodes', val: data.torNodes ? data.torNodes.toLocaleString() : '--' },
+      { label: 'Clearnet Nodes', val: data.clearnetNodes ? data.clearnetNodes.toLocaleString() : '--' },
+      { label: 'Avg Channel Size', val: data.avgCapacity ? (data.avgCapacity * 1e8).toLocaleString(undefined, {maximumFractionDigits: 0}) + ' sats' : '--' },
+      { label: 'Median Fee Rate', val: data.medFeeRate ? data.medFeeRate + ' ppm' : '--' },
+    ].map(function(r) {
+      return '<div class="ln-row"><span class="ln-label">' + r.label + '</span><span class="ln-val">' + r.val + '</span></div>';
+    }).join('');
+
+  // Capacity history chart
+  if (data.capacityHistory && data.capacityHistory.length > 1) {
+    var el = document.getElementById('lnCapChart');
+    if (!el) return;
+    var ctx = el.getContext('2d');
+    if (lnCapChart) lnCapChart.destroy();
+
+    var labels = data.capacityHistory.map(function(h) { return new Date(h.t); });
+    var values = data.capacityHistory.map(function(h) { return h.cap; });
+
+    lnCapChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          data: values,
+          borderColor: '#f7931a',
+          borderWidth: 2,
+          backgroundColor: createGradient(ctx, '#f7931a', 120),
+          fill: true,
+          tension: 0.4,
+          pointRadius: 0,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: { type: 'time', grid: { display: false }, ticks: { maxTicksLimit: 5, font: { size: 10 } } },
+          y: {
+            grid: { color: '#25253020' },
+            ticks: {
+              callback: function(v) { return v.toFixed(0) + ' BTC'; },
+              font: { size: 10, family: "'JetBrains Mono', monospace" }
+            }
+          }
+        },
+        plugins: {
+          tooltip: {
+            callbacks: { label: function(ctx) { return ctx.parsed.y.toFixed(0) + ' BTC capacity'; } }
+          }
+        }
+      }
+    });
+  }
+}
+
 // ===== MACRO =====
 
 var macroSparkCharts = [];
@@ -737,7 +951,17 @@ function renderMacro(data) {
   // Gold
   if (data.gold) {
     var g = data.gold;
+    cachedGoldPrice = g.price;
     tiles.push({ key: 'gold', name: 'Gold', value: '$' + g.price.toLocaleString(undefined, {maximumFractionDigits:0}), change: g.changePct, spark: g.sparkline, cls: 'neutral-btc', context: 'Digital gold vs physical gold' });
+    // Update BTC/Gold ratio
+    if (btcPriceGlobal) {
+      var ratio = btcPriceGlobal / g.price;
+      document.getElementById('btcGoldValue').textContent = ratio.toFixed(1) + ' oz';
+      var badge = document.getElementById('btcGoldBadge');
+      badge.textContent = ratio.toFixed(1) + ' oz/BTC';
+      badge.className = 'badge bullish';
+    }
+    renderBtcGoldChart(g.sparkline);
   }
 
   // SPX
@@ -896,9 +1120,13 @@ async function refreshAll() {
     fetchNews().catch(e => console.error('news failed:', e)),
     fetchMining().catch(e => console.error('mining failed:', e)),
     fetchMacro().catch(e => console.error('macro failed:', e)),
+    fetchLightning().catch(e => console.error('lightning failed:', e)),
   ];
 
   await Promise.allSettled(tasks);
+
+  // Render cycle (local calculation, no API)
+  renderCycle();
 
   // TA and X posts after main data (rate-limited sources)
   setTimeout(() => {

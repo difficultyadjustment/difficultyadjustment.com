@@ -288,6 +288,65 @@ app.get('/api/macro', cached('macro', 600000, async () => {
   return results;
 }));
 
+// BTC long-range chart via Yahoo Finance (CoinGecko limits to 365 days)
+app.get('/api/chart-long/:range', async (req, res) => {
+  const range = req.params.range;
+  const key = 'chart-long-' + range;
+  const handler = cached(key, 600000, async () => {
+    const interval = range === 'max' ? '1wk' : '1d';
+    const url = 'https://query2.finance.yahoo.com/v8/finance/chart/BTC-USD?interval=' +
+      interval + '&range=' + encodeURIComponent(range);
+    const resp = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!resp.ok) throw new Error('Yahoo ' + resp.status);
+    const data = await resp.json();
+    const result = data.chart?.result?.[0];
+    if (!result) throw new Error('No data');
+    const timestamps = result.timestamp || [];
+    const closes = result.indicators?.quote?.[0]?.close || [];
+    const prices = [];
+    for (let i = 0; i < timestamps.length; i++) {
+      if (closes[i] != null) prices.push([timestamps[i] * 1000, closes[i]]);
+    }
+    return { prices };
+  });
+  return handler(req, res);
+});
+
+// Lightning Network stats — cache 600s
+app.get('/api/lightning', cached('lightning', 600000, async () => {
+  const [statsResp, histResp] = await Promise.all([
+    fetch('https://mempool.space/api/v1/lightning/statistics/latest', { signal: AbortSignal.timeout(10000) }),
+    fetch('https://mempool.space/api/v1/lightning/statistics/3m', { signal: AbortSignal.timeout(10000) }),
+  ]);
+  if (!statsResp.ok) throw new Error('LN stats ' + statsResp.status);
+  const stats = await statsResp.json();
+  const latest = stats.latest || {};
+
+  let history = [];
+  if (histResp.ok) {
+    history = await histResp.json();
+  }
+
+  return {
+    channels: latest.channel_count,
+    nodes: latest.node_count,
+    capacityBtc: latest.total_capacity ? latest.total_capacity / 1e8 : null,
+    torNodes: latest.tor_nodes,
+    clearnetNodes: latest.clearnet_nodes,
+    avgCapacity: latest.avg_capacity ? latest.avg_capacity / 1e8 : null,
+    medFeeRate: latest.med_fee_rate,
+    avgFeeRate: latest.avg_fee_rate,
+    capacityHistory: history.map(h => ({
+      t: new Date(h.added).getTime(),
+      cap: h.total_capacity / 1e8,
+      channels: h.channel_count,
+    })),
+  };
+}));
+
 // Mining & Difficulty — cache 300s
 app.get('/api/mining', cached('mining', 300000, async () => {
   const [diffResp, hashResp] = await Promise.all([

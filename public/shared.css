@@ -124,22 +124,24 @@ body {
   position: absolute;
   top: 100%;
   left: 0;
-  margin-top: 8px;
+  padding-top: 8px;
+  z-index: 100;
+}
+
+.nav-dropdown-menu-inner {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 8px 0;
   min-width: 220px;
   box-shadow: var(--shadow-lg);
-  z-index: 100;
 }
 
-.nav-dropdown:hover .nav-dropdown-menu,
-.nav-dropdown-menu:hover {
+.nav-dropdown:hover .nav-dropdown-menu {
   display: block;
 }
 
-.nav-dropdown-menu a {
+.nav-dropdown-menu-inner a {
   display: block;
   padding: 10px 16px;
   color: var(--text-secondary);
@@ -148,7 +150,7 @@ body {
   transition: all 0.15s;
 }
 
-.nav-dropdown-menu a:hover {
+.nav-dropdown-menu-inner a:hover {
   background: var(--bg-card-hover);
   color: var(--accent);
 }

@@ -559,8 +559,8 @@ function renderMining(data) {
   const remainDays = Math.floor(adj.remainingTime / 86400000);
   const remainHrs = Math.floor((adj.remainingTime % 86400000) / 3600000);
 
-  // Avg block time
-  const avgBlock = (adj.timeAvg / 60).toFixed(1);
+  // Avg block time (mempool returns milliseconds)
+  const avgBlock = (adj.timeAvg / 1000 / 60).toFixed(1);
 
   diffContent.innerHTML =
     '<div class="diff-hero">' +
@@ -690,6 +690,71 @@ function renderXPosts(posts) {
     '</div>';
   }).join('');
 }
+
+// ===== SETTINGS / SECTION TOGGLES =====
+
+function getHiddenSections() {
+  try { return JSON.parse(localStorage.getItem('btcintel_hidden') || '[]'); }
+  catch (e) { return []; }
+}
+
+function saveHiddenSections(arr) {
+  localStorage.setItem('btcintel_hidden', JSON.stringify(arr));
+}
+
+function applySectionVisibility() {
+  var hidden = getHiddenSections();
+  document.querySelectorAll('.section-panel').forEach(function(el) {
+    var section = el.getAttribute('data-section');
+    if (hidden.indexOf(section) !== -1) {
+      el.classList.add('section-hidden');
+    } else {
+      el.classList.remove('section-hidden');
+    }
+  });
+  // Sync checkboxes
+  document.querySelectorAll('#settingsDropdown input[type="checkbox"]').forEach(function(cb) {
+    cb.checked = hidden.indexOf(cb.getAttribute('data-section')) === -1;
+  });
+}
+
+function toggleSection(cb) {
+  var section = cb.getAttribute('data-section');
+  var hidden = getHiddenSections();
+  var idx = hidden.indexOf(section);
+  if (cb.checked && idx !== -1) {
+    hidden.splice(idx, 1);
+  } else if (!cb.checked && idx === -1) {
+    hidden.push(section);
+  }
+  saveHiddenSections(hidden);
+  applySectionVisibility();
+}
+
+function toggleSettings() {
+  var dd = document.getElementById('settingsDropdown');
+  var btn = document.getElementById('settingsBtn');
+  dd.classList.toggle('open');
+  btn.classList.toggle('active');
+}
+
+function resetSections() {
+  saveHiddenSections([]);
+  applySectionVisibility();
+}
+
+// Close settings when clicking outside
+document.addEventListener('click', function(e) {
+  var dd = document.getElementById('settingsDropdown');
+  var btn = document.getElementById('settingsBtn');
+  if (dd.classList.contains('open') && !dd.contains(e.target) && e.target !== btn) {
+    dd.classList.remove('open');
+    btn.classList.remove('active');
+  }
+});
+
+// Apply saved visibility on load
+applySectionVisibility();
 
 // ===== INIT =====
 

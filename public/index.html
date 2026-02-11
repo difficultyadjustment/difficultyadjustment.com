@@ -29,11 +29,26 @@
         <div class="live-dot"></div>
         <span class="last-update" id="lastUpdate">Loading...</span>
         <button class="refresh-btn" onclick="refreshAll()">↻ Refresh</button>
+        <button class="settings-btn" id="settingsBtn" onclick="toggleSettings()">⚙</button>
       </div>
     </header>
 
+    <!-- Settings Dropdown -->
+    <div class="settings-dropdown" id="settingsDropdown">
+      <div class="settings-title">Show / Hide Sections</div>
+      <label class="settings-toggle"><input type="checkbox" data-section="fng" checked onchange="toggleSection(this)"> Fear & Greed</label>
+      <label class="settings-toggle"><input type="checkbox" data-section="stats" checked onchange="toggleSection(this)"> Global Stats</label>
+      <label class="settings-toggle"><input type="checkbox" data-section="btc-hero" checked onchange="toggleSection(this)"> BTC Price & Chart</label>
+      <label class="settings-toggle"><input type="checkbox" data-section="ta" checked onchange="toggleSection(this)"> Technical Analysis</label>
+      <label class="settings-toggle"><input type="checkbox" data-section="mining" checked onchange="toggleSection(this)"> Mining & Difficulty</label>
+      <label class="settings-toggle"><input type="checkbox" data-section="news" checked onchange="toggleSection(this)"> Bitcoin News & X</label>
+      <label class="settings-toggle"><input type="checkbox" data-section="vitals" checked onchange="toggleSection(this)"> Bitcoin Vitals</label>
+      <label class="settings-toggle"><input type="checkbox" data-section="shitcoins" checked onchange="toggleSection(this)"> Shitcoin Index</label>
+      <div class="settings-reset" onclick="resetSections()">↻ Show All</div>
+    </div>
+
     <!-- Fear & Greed Banner -->
-    <div class="fng-banner" id="fngBanner">
+    <div class="fng-banner section-panel" data-section="fng" id="fngBanner">
       <div class="fng-gauge">
         <div class="fng-circle" id="fngCircle">
           <span class="fng-value" id="fngValue">--</span>
@@ -50,7 +65,7 @@
     </div>
 
     <!-- Global Stats Bar -->
-    <div class="stats-bar" id="globalStats">
+    <div class="stats-bar section-panel" data-section="stats" id="globalStats">
       <div class="stat highlight-stat">
         <span class="stat-label">₿ Dominance</span>
         <span class="stat-value btc-orange" id="btcDom">--</span>
@@ -77,7 +92,7 @@
     <!-- Main Grid -->
     <div class="main-grid">
       <!-- BTC Hero Card -->
-      <div class="card btc-hero">
+      <div class="card btc-hero section-panel" data-section="btc-hero">
         <div class="card-header">
           <div class="coin-identity">
             <img id="btcLogo" class="coin-logo" alt="BTC">
@@ -106,7 +121,7 @@
       </div>
 
       <!-- Technical Analysis Card -->
-      <div class="card ta-card">
+      <div class="card ta-card section-panel" data-section="ta">
         <div class="card-header">
           <h3>📈 Technical Analysis</h3>
           <span class="badge" id="taSignal">--</span>
@@ -118,7 +133,7 @@
     </div>
 
     <!-- Mining & Difficulty Section -->
-    <div class="mining-section">
+    <div class="mining-section section-panel" data-section="mining">
       <div class="card mining-card">
         <div class="card-header">
           <h3>⛏️ Difficulty Adjustment</h3>
@@ -142,7 +157,7 @@
     <!-- News + Vitals Row (below chart) -->
     <div class="news-vitals-grid">
       <!-- News Feed -->
-      <div class="card news-card">
+      <div class="card news-card section-panel" data-section="news">
         <div class="card-header">
           <h3>📰 Bitcoin News</h3>
           <span class="news-count" id="newsCount"></span>
@@ -163,7 +178,7 @@
       <!-- Right column: Vitals + Shitcoin Index -->
       <div class="news-vitals-right">
         <!-- Bitcoin Vitals -->
-        <div class="card vitals-card">
+        <div class="card vitals-card section-panel" data-section="vitals">
           <div class="card-header">
             <h3>⛏️ Bitcoin Vitals</h3>
           </div>
@@ -173,7 +188,7 @@
         </div>
 
         <!-- Shitcoin Index -->
-        <div class="card price-table-card">
+        <div class="card price-table-card section-panel" data-section="shitcoins">
           <div class="card-header">
             <h3>📉 Shitcoin Index</h3>
             <span class="shitcoin-disclaimer">Shown for context. Not endorsements.</span>

@@ -93,6 +93,18 @@ async function fetchNews() {
   if (Array.isArray(data) && data.length) renderNews(data);
 }
 
+async function fetchMining() {
+  const res = await fetch('/api/mining');
+  const data = await res.json();
+  if (data.adjustment) renderMining(data);
+}
+
+async function fetchXPosts() {
+  const res = await fetch('/api/x-posts');
+  const data = await res.json();
+  if (Array.isArray(data) && data.length) renderXPosts(data);
+}
+
 async function loadChart(coin, days, btn) {
   if (btn) {
     document.querySelectorAll('.chart-tabs .tab').forEach(t => t.classList.remove('active'));
@@ -518,6 +530,167 @@ function renderNews(articles) {
   }).join('');
 }
 
+// ===== MINING & DIFFICULTY =====
+
+let hashrateChart = null;
+
+function renderMining(data) {
+  const adj = data.adjustment;
+  const diffContent = document.getElementById('diffContent');
+  const diffBadge = document.getElementById('diffBadge');
+
+  // Badge
+  const change = adj.difficultyChange;
+  const isUp = change >= 0;
+  diffBadge.textContent = (isUp ? '+' : '') + change.toFixed(1) + '%';
+  diffBadge.className = 'badge ' + (isUp ? 'negative' : 'bullish'); // harder = bullish for miners' commitment
+
+  // Progress gauge (SVG donut)
+  const progress = adj.progressPercent;
+  const circumference = 2 * Math.PI * 40;
+  const offset = circumference - (progress / 100) * circumference;
+  const gaugeColor = isUp ? '#f7931a' : '#22c55e';
+
+  // Estimated retarget date
+  const retargetDate = new Date(adj.estimatedRetargetDate);
+  const retargetStr = retargetDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+  // Remaining time
+  const remainDays = Math.floor(adj.remainingTime / 86400000);
+  const remainHrs = Math.floor((adj.remainingTime % 86400000) / 3600000);
+
+  // Avg block time
+  const avgBlock = (adj.timeAvg / 60).toFixed(1);
+
+  diffContent.innerHTML =
+    '<div class="diff-hero">' +
+      '<div class="diff-gauge">' +
+        '<svg viewBox="0 0 100 100">' +
+          '<circle class="diff-gauge-bg" cx="50" cy="50" r="40"></circle>' +
+          '<circle class="diff-gauge-fill" cx="50" cy="50" r="40" ' +
+            'stroke="' + gaugeColor + '" ' +
+            'stroke-dasharray="' + circumference + '" ' +
+            'stroke-dashoffset="' + offset + '"></circle>' +
+        '</svg>' +
+        '<div class="diff-gauge-text">' + progress.toFixed(1) + '%</div>' +
+      '</div>' +
+      '<div class="diff-info">' +
+        '<div class="diff-projected" style="color:' + (isUp ? '#f7931a' : '#22c55e') + '">' +
+          (isUp ? '↑ ' : '↓ ') + Math.abs(change).toFixed(2) + '% projected' +
+        '</div>' +
+        '<div class="diff-est-date">Est. ' + retargetStr + '</div>' +
+        '<div class="diff-remaining">' + adj.remainingBlocks.toLocaleString() + ' blocks · ~' + remainDays + 'd ' + remainHrs + 'h remaining</div>' +
+      '</div>' +
+    '</div>' +
+    [
+      { label: 'Next Retarget Height', val: adj.nextRetargetHeight.toLocaleString() },
+      { label: 'Avg Block Time', val: avgBlock + ' min' + (avgBlock < 10 ? ' ⚡' : '') },
+      { label: 'Previous Adjustment', val: (adj.previousRetarget >= 0 ? '+' : '') + adj.previousRetarget.toFixed(2) + '%' },
+      { label: 'Current Hashrate', val: data.hashrate ? data.hashrate.toFixed(1) + ' EH/s' : '--' },
+      { label: 'Current Difficulty', val: data.difficulty ? data.difficulty.toFixed(2) + ' T' : '--' },
+      { label: 'Block Height', val: data.blockHeight ? data.blockHeight.toLocaleString() : '--' },
+    ].map(function(r) {
+      return '<div class="diff-row">' +
+        '<span class="diff-label">' + r.label + '</span>' +
+        '<span class="diff-val">' + r.val + '</span>' +
+      '</div>';
+    }).join('');
+
+  // Hashrate chart
+  if (data.hashSparkline && data.hashSparkline.length) {
+    renderHashrateChart(data.hashSparkline, data.hashrate);
+  }
+
+  // Hashrate stats
+  if (data.hashSparkline && data.hashSparkline.length > 1) {
+    const sparkArr = data.hashSparkline;
+    const oldest = sparkArr[0].v;
+    const newest = sparkArr[sparkArr.length - 1].v;
+    const change3m = ((newest - oldest) / oldest * 100).toFixed(1);
+    const max = Math.max(...sparkArr.map(s => s.v));
+    const min = Math.min(...sparkArr.map(s => s.v));
+
+    document.getElementById('hashrateStats').innerHTML =
+      '<div class="hashrate-stat"><div class="label">Current</div><div class="value">' + newest.toFixed(1) + ' EH/s</div></div>' +
+      '<div class="hashrate-stat"><div class="label">3M Change</div><div class="value ' + (change3m >= 0 ? 'positive' : 'negative') + '">' + (change3m >= 0 ? '+' : '') + change3m + '%</div></div>' +
+      '<div class="hashrate-stat"><div class="label">3M Range</div><div class="value">' + min.toFixed(0) + ' – ' + max.toFixed(0) + '</div></div>';
+  }
+}
+
+function renderHashrateChart(sparkline, currentRate) {
+  const ctx = document.getElementById('hashrateChart').getContext('2d');
+  const labels = sparkline.map(s => new Date(s.t));
+  const values = sparkline.map(s => s.v);
+
+  if (hashrateChart) hashrateChart.destroy();
+
+  hashrateChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        borderColor: '#f7931a',
+        borderWidth: 2,
+        backgroundColor: createGradient(ctx, '#f7931a', 200),
+        fill: true,
+        tension: 0.4,
+        pointRadius: 0,
+        pointHitRadius: 10,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: {
+          type: 'time',
+          grid: { display: false },
+          ticks: { maxTicksLimit: 6, font: { size: 10 } }
+        },
+        y: {
+          grid: { color: '#25253020' },
+          ticks: {
+            callback: function(v) { return v.toFixed(0) + ' EH/s'; },
+            font: { size: 10, family: "'JetBrains Mono', monospace" }
+          }
+        }
+      },
+      plugins: {
+        tooltip: {
+          backgroundColor: '#16161f',
+          borderColor: '#252530',
+          borderWidth: 1,
+          callbacks: {
+            label: function(ctx) { return ctx.parsed.y.toFixed(1) + ' EH/s'; }
+          }
+        }
+      }
+    }
+  });
+}
+
+// ===== X POSTS =====
+
+function renderXPosts(posts) {
+  if (!posts.length) return;
+  const section = document.getElementById('xPostsSection');
+  const feed = document.getElementById('xPostsFeed');
+  section.style.display = 'block';
+
+  feed.innerHTML = posts.slice(0, 6).map(function(p) {
+    return '<div class="x-post">' +
+      '<a href="' + p.url + '" target="_blank" rel="noopener">' +
+        '<div class="x-post-source">' + p.source + '</div>' +
+        '<div class="x-post-title">' + p.title + '</div>' +
+        '<div class="x-post-desc">' + (p.description || '') + '</div>' +
+        (p.published ? '<div class="x-post-time">' + p.published + '</div>' : '') +
+      '</a>' +
+    '</div>';
+  }).join('');
+}
+
 // ===== INIT =====
 
 function updateTimestamp() {
@@ -533,12 +706,16 @@ async function refreshAll() {
     fetchGlobal().catch(e => console.error('global failed:', e)),
     loadChart('bitcoin', 1).catch(e => console.error('chart failed:', e)),
     fetchNews().catch(e => console.error('news failed:', e)),
+    fetchMining().catch(e => console.error('mining failed:', e)),
   ];
 
   await Promise.allSettled(tasks);
 
-  // TA after main data
-  setTimeout(() => fetchTA().catch(e => console.error('ta failed:', e)), 2000);
+  // TA and X posts after main data (rate-limited sources)
+  setTimeout(() => {
+    fetchTA().catch(e => console.error('ta failed:', e));
+    fetchXPosts().catch(e => console.error('x-posts failed:', e));
+  }, 2000);
 
   updateTimestamp();
 }

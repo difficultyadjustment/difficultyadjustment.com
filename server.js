@@ -9,6 +9,15 @@ const TOOLS_DIR = process.env.TOOLS_DIR || '/Users/alfred/.openclaw/workspace/to
 const CACHE_DIR = path.join(TOOLS_DIR, 'cache');
 const AUTH_PASSWORD = process.env.DASHBOARD_PASSWORD || null;
 
+// Try to load Brave API key from OpenClaw config
+let BRAVE_API_KEY = process.env.BRAVE_API_KEY || '';
+if (!BRAVE_API_KEY) {
+  try {
+    const ocConfig = JSON.parse(fs.readFileSync(path.join(process.env.HOME || '', '.openclaw/openclaw.json'), 'utf8'));
+    BRAVE_API_KEY = ocConfig?.tools?.web?.search?.apiKey || '';
+  } catch (e) { /* no config available */ }
+}
+
 // Simple auth middleware (optional — set DASHBOARD_PASSWORD env to enable)
 if (AUTH_PASSWORD) {
   app.use((req, res, next) => {
@@ -169,6 +178,101 @@ app.get('/api/news', cached('news', 300000, async () => {
     published: a.published_on,
     categories: a.categories,
   }));
+}));
+
+// Mining & Difficulty — cache 300s
+app.get('/api/mining', cached('mining', 300000, async () => {
+  const [diffResp, hashResp] = await Promise.all([
+    fetch('https://mempool.space/api/v1/difficulty-adjustment', { signal: AbortSignal.timeout(10000) }),
+    fetch('https://mempool.space/api/v1/mining/hashrate/3m', { signal: AbortSignal.timeout(10000) }),
+  ]);
+  if (!diffResp.ok) throw new Error('Mempool diff ' + diffResp.status);
+  if (!hashResp.ok) throw new Error('Mempool hash ' + hashResp.status);
+  const diff = await diffResp.json();
+  const hash = await hashResp.json();
+  
+  // Get latest hashrate and build sparkline
+  const hashrates = hash.hashrates || [];
+  const difficulties = hash.difficulty || [];
+  const latestHash = hashrates.length ? hashrates[hashrates.length - 1] : null;
+  const latestDiff = difficulties.length ? difficulties[difficulties.length - 1] : null;
+  
+  // Hashrate sparkline (last 30 points)
+  const hashSparkline = hashrates.slice(-30).map(h => ({
+    t: h.timestamp * 1000,
+    v: h.avgHashrate / 1e18 // EH/s
+  }));
+  
+  // Difficulty sparkline
+  const diffSparkline = difficulties.map(d => ({
+    t: d.time * 1000,
+    v: d.difficulty / 1e12 // T
+  }));
+  
+  return {
+    adjustment: {
+      progressPercent: diff.progressPercent,
+      difficultyChange: diff.difficultyChange,
+      estimatedRetargetDate: diff.estimatedRetargetDate,
+      remainingBlocks: diff.remainingBlocks,
+      remainingTime: diff.remainingTime,
+      previousRetarget: diff.previousRetarget,
+      nextRetargetHeight: diff.nextRetargetHeight,
+      timeAvg: diff.timeAvg,
+    },
+    hashrate: latestHash ? latestHash.avgHashrate / 1e18 : null, // EH/s
+    difficulty: latestDiff ? latestDiff.difficulty / 1e12 : null, // T
+    blockHeight: latestDiff ? latestDiff.height : null,
+    hashSparkline,
+    diffSparkline,
+  };
+}));
+
+// Bitcoin Twitter / X posts — cache 600s (uses Brave Search, rate limited)
+app.get('/api/x-posts', cached('xposts', 600000, async () => {
+  if (!BRAVE_API_KEY) return [];
+  
+  const queries = [
+    'bitcoin "on X" OR "posted on X" OR "tweeted" saylor OR btc',
+    'bitcoin twitter trending opinion analysis'
+  ];
+  
+  const allResults = [];
+  for (const q of queries) {
+    try {
+      const url = `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(q)}&freshness=pw&count=5`;
+      const resp = await fetch(url, {
+        headers: { 'Accept': 'application/json', 'Accept-Encoding': 'gzip', 'X-Subscription-Token': BRAVE_API_KEY },
+        signal: AbortSignal.timeout(10000),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.web?.results) {
+          allResults.push(...data.web.results.map(r => ({
+            title: r.title,
+            url: r.url,
+            description: r.description,
+            published: r.age || null,
+            source: new URL(r.url).hostname.replace('www.', ''),
+          })));
+        }
+      }
+      // Rate limit between queries
+      await new Promise(r => setTimeout(r, 1200));
+    } catch (e) { /* skip failed query */ }
+  }
+  
+  // Deduplicate by URL
+  const seen = new Set();
+  const unique = allResults.filter(r => {
+    if (seen.has(r.url)) return false;
+    seen.add(r.url);
+    return true;
+  });
+  
+  // Filter out irrelevant
+  const shitcoinRegex = /\b(XRP|ripple|solana|dogecoin|shiba|cardano|altcoin)\b/i;
+  return unique.filter(r => !shitcoinRegex.test(r.title)).slice(0, 8);
 }));
 
 // TA — cache 300s

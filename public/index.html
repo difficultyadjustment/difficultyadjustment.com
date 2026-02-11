@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>₿ Bitcoin Intelligence Dashboard</title>
-  <meta name="description" content="Real-time Bitcoin intelligence — price charts, technical analysis, Fear & Greed index, and curated news. There is no second best.">
-  <meta property="og:title" content="Bitcoin Intelligence Dashboard">
-  <meta property="og:description" content="Real-time Bitcoin intelligence — charts, TA, Fear & Greed, news. There is no second best.">
+  <meta name="description" content="Real-time Bitcoin intelligence — price charts, technical analysis, mining stats, difficulty adjustments, and curated news. difficultyadjustment.com">
+  <meta property="og:title" content="Difficulty Adjustment — Bitcoin Intelligence">
+  <meta property="og:description" content="Real-time Bitcoin intelligence — charts, TA, mining, difficulty, Fear & Greed. There is no second best.">
   <meta property="og:type" content="website">
   <meta name="theme-color" content="#f7931a">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>₿</text></svg>">
@@ -115,43 +115,32 @@
           <div class="ta-loading">Running TA...</div>
         </div>
       </div>
+    </div>
 
-      <!-- Bitcoin Vitals -->
-      <div class="card vitals-card">
+    <!-- Mining & Difficulty Section -->
+    <div class="mining-section">
+      <div class="card mining-card">
         <div class="card-header">
-          <h3>⛏️ Bitcoin Vitals</h3>
+          <h3>⛏️ Difficulty Adjustment</h3>
+          <span class="badge" id="diffBadge">--</span>
         </div>
-        <div class="vitals-content" id="vitalsContent">
-          <div class="ta-loading">Loading...</div>
+        <div class="diff-content" id="diffContent">
+          <div class="ta-loading">Loading mining data...</div>
         </div>
       </div>
-
-      <!-- Shitcoin Index (formerly Price Table) -->
-      <div class="card price-table-card">
+      <div class="card mining-card">
         <div class="card-header">
-          <h3>📉 Shitcoin Index</h3>
-          <span class="shitcoin-disclaimer">Shown for context. Not endorsements.</span>
+          <h3>🔥 Hashrate</h3>
         </div>
-        <div class="table-wrapper">
-          <table class="price-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Token</th>
-                <th>Price</th>
-                <th>1h</th>
-                <th>24h</th>
-                <th>7d</th>
-                <th>vs BTC (7d)</th>
-                <th>Market Cap</th>
-                <th class="sparkline-col">7D Chart</th>
-              </tr>
-            </thead>
-            <tbody id="priceTableBody"></tbody>
-          </table>
+        <div class="hashrate-chart-wrapper">
+          <canvas id="hashrateChart" height="180"></canvas>
         </div>
+        <div class="hashrate-stats" id="hashrateStats"></div>
       </div>
+    </div>
 
+    <!-- News + Vitals Row (below chart) -->
+    <div class="news-vitals-grid">
       <!-- News Feed -->
       <div class="card news-card">
         <div class="card-header">
@@ -161,11 +150,58 @@
         <div class="news-feed" id="newsFeed">
           <div class="ta-loading">Loading news...</div>
         </div>
+        <!-- X Posts Section -->
+        <div class="x-posts-section" id="xPostsSection" style="display:none">
+          <div class="x-posts-header">
+            <span class="x-logo">𝕏</span>
+            <span>Bitcoin on X</span>
+          </div>
+          <div class="x-posts-feed" id="xPostsFeed"></div>
+        </div>
+      </div>
+
+      <!-- Right column: Vitals + Shitcoin Index -->
+      <div class="news-vitals-right">
+        <!-- Bitcoin Vitals -->
+        <div class="card vitals-card">
+          <div class="card-header">
+            <h3>⛏️ Bitcoin Vitals</h3>
+          </div>
+          <div class="vitals-content" id="vitalsContent">
+            <div class="ta-loading">Loading...</div>
+          </div>
+        </div>
+
+        <!-- Shitcoin Index -->
+        <div class="card price-table-card">
+          <div class="card-header">
+            <h3>📉 Shitcoin Index</h3>
+            <span class="shitcoin-disclaimer">Shown for context. Not endorsements.</span>
+          </div>
+          <div class="table-wrapper">
+            <table class="price-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Token</th>
+                  <th>Price</th>
+                  <th>1h</th>
+                  <th>24h</th>
+                  <th>7d</th>
+                  <th>vs BTC (7d)</th>
+                  <th>Market Cap</th>
+                  <th class="sparkline-col">7D Chart</th>
+                </tr>
+              </thead>
+              <tbody id="priceTableBody"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
 
     <footer class="footer">
-      <span>₿ Bitcoin Intelligence Dashboard • There is no second best • Data: CoinGecko • Fear & Greed: Alternative.me</span>
+      <span>₿ difficultyadjustment.com • There is no second best • Data: CoinGecko, mempool.space • Fear & Greed: Alternative.me</span>
     </footer>
   </div>
 

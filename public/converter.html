@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>₿ Sats Converter — Difficulty Adjustment</title>
+  <meta name="description" content="Convert between Bitcoin, satoshis, and fiat currencies instantly. Live BTC price with real-time conversion.">
+  <meta name="theme-color" content="#f7931a">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>₿</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    .converter-wrap {
+      max-width: 640px;
+      margin: 0 auto 48px;
+    }
+
+    /* Primary input */
+    .primary-input-card {
+      background: var(--bg-card);
+      border: 2px solid var(--accent);
+      border-radius: var(--radius);
+      padding: 28px 24px;
+      margin-bottom: 16px;
+      box-shadow: 0 0 30px rgba(247, 147, 26, 0.08);
+      transition: box-shadow 0.3s;
+    }
+
+    .primary-input-card:focus-within {
+      box-shadow: 0 0 40px rgba(247, 147, 26, 0.15);
+    }
+
+    .primary-input-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .primary-input-label .label-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .primary-input-label .currency-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+
+    .currency-icon.btc {
+      background: var(--btc-gradient);
+      color: #fff;
+    }
+
+    .currency-icon.sats {
+      background: linear-gradient(135deg, #eab308 0%, #d97706 100%);
+      color: #fff;
+      font-size: 13px;
+    }
+
+    .currency-icon.fiat {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      font-size: 13px;
+    }
+
+    .primary-input-label .currency-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .primary-input-label .currency-code {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .primary-input-field {
+      width: 100%;
+      background: transparent;
+      border: none;
+      color: var(--text-primary);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 36px;
+      font-weight: 600;
+      outline: none;
+      letter-spacing: -0.5px;
+    }
+
+    .primary-input-field::placeholder {
+      color: var(--text-muted);
+      opacity: 0.4;
+    }
+
+    .primary-input-field::-webkit-inner-spin-button,
+    .primary-input-field::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+
+    .primary-input-field[type=number] {
+      -moz-appearance: textfield;
+    }
+
+    .price-tag {
+      font-size: 13px;
+      color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Conversion rows */
+    .conversion-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .conversion-row {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      transition: all 0.2s;
+      user-select: none;
+    }
+
+    .conversion-row:hover {
+      border-color: var(--border-light);
+      background: var(--bg-card-hover);
+    }
+
+    .conversion-row.active {
+      border-color: var(--accent);
+      background: var(--bg-card);
+      box-shadow: 0 0 20px rgba(247, 147, 26, 0.06);
+    }
+
+    .conversion-row .row-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .conversion-row .row-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .conversion-row .row-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .conversion-row .row-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .conversion-row .row-code {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .conversion-row .row-right {
+      text-align: right;
+    }
+
+    .conversion-row .row-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .conversion-row .row-unit {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .conversion-row .row-input {
+      background: transparent;
+      border: none;
+      color: var(--text-primary);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 16px;
+      font-weight: 600;
+      text-align: right;
+      outline: none;
+      width: 160px;
+    }
+
+    .conversion-row .row-input::placeholder {
+      color: var(--text-muted);
+      opacity: 0.4;
+    }
+
+    .conversion-row .row-input::-webkit-inner-spin-button,
+    .conversion-row .row-input::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+    }
+
+    .conversion-row .row-input[type=number] {
+      -moz-appearance: textfield;
+    }
+
+    /* Section divider */
+    .section-divider {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin: 36px 0 24px;
+    }
+
+    .section-divider .line {
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .section-divider .label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    /* Quick reference */
+    .quick-ref {
+      max-width: 640px;
+      margin: 0 auto 48px;
+    }
+
+    .quick-ref-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      text-align: center;
+      color: var(--text-primary);
+    }
+
+    .quick-ref-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    .quick-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px 16px;
+      text-align: center;
+      transition: border-color 0.2s;
+    }
+
+    .quick-card:hover {
+      border-color: var(--border-light);
+    }
+
+    .quick-card .qc-question {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+      font-weight: 500;
+    }
+
+    .quick-card .qc-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 4px;
+    }
+
+    .quick-card .qc-label {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* Info bar */
+    .info-bar {
+      max-width: 640px;
+      margin: 0 auto 32px;
+      background: var(--accent-dim);
+      border: 1px solid rgba(247, 147, 26, 0.2);
+      border-radius: var(--radius-sm);
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .info-bar .btc-price {
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    /* Swap button */
+    .swap-hint {
+      text-align: center;
+      margin: 12px 0;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .swap-hint span {
+      opacity: 0.6;
+    }
+
+    @media (max-width: 640px) {
+      .primary-input-field {
+        font-size: 28px;
+      }
+      .quick-ref-grid {
+        grid-template-columns: 1fr;
+      }
+      .conversion-row .row-input,
+      .conversion-row .row-value {
+        font-size: 14px;
+      }
+      .conversion-row .row-input {
+        width: 120px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="header-left">
+        <a href="/">
+          <span class="logo">₿</span>
+          <h1>Difficulty<span class="accent">Adjustment</span></h1>
+        </a>
+        <nav class="site-nav">
+          <a href="/" class="nav-link">Dashboard</a>
+          <a href="/history" class="nav-link">History</a>
+          <a href="/learn" class="nav-link">Bitcoin 101</a>
+          <a href="/calculator" class="nav-link">Calculator</a>
+          <a href="/converter" class="nav-link active">Converter</a>
+        </nav>
+      </div>
+      <div class="header-right"></div>
+    </header>
+
+    <div class="page-hero">
+      <h2>Sats <span class="accent">Converter</span></h2>
+      <p class="subtitle">Convert between Bitcoin, satoshis, and fiat currencies instantly</p>
+    </div>
+
+    <div class="info-bar">
+      <span>₿ 1 BTC =</span>
+      <span class="btc-price" id="btcPriceDisplay">Loading...</span>
+      <span>USD</span>
+    </div>
+
+    <!-- Main converter -->
+    <div class="converter-wrap">
+
+      <!-- Primary BTC input -->
+      <div class="primary-input-card" id="primaryCard">
+        <div class="primary-input-label">
+          <div class="label-left">
+            <div class="currency-icon btc">₿</div>
+            <div>
+              <div class="currency-name" id="primaryName">Bitcoin</div>
+              <div class="currency-code" id="primaryCode">BTC</div>
+            </div>
+          </div>
+          <div class="price-tag" id="primarySubtext"></div>
+        </div>
+        <input type="number" class="primary-input-field" id="primaryInput" value="1" min="0" step="any" placeholder="0">
+      </div>
+
+      <div class="swap-hint"><span>↕ Click any row below to make it the primary input</span></div>
+
+      <!-- Conversion rows -->
+      <div class="conversion-list" id="conversionList"></div>
+
+      <!-- Quick reference -->
+      <div class="section-divider">
+        <div class="line"></div>
+        <div class="label">Quick Reference</div>
+        <div class="line"></div>
+      </div>
+
+      <div class="quick-ref">
+        <div class="quick-ref-grid">
+          <div class="quick-card">
+            <div class="qc-question">How many sats is $1?</div>
+            <div class="qc-value" id="qr1">—</div>
+            <div class="qc-label">satoshis</div>
+          </div>
+          <div class="quick-card">
+            <div class="qc-question">How many sats is $10?</div>
+            <div class="qc-value" id="qr10">—</div>
+            <div class="qc-label">satoshis</div>
+          </div>
+          <div class="quick-card">
+            <div class="qc-question">How many sats is $100?</div>
+            <div class="qc-value" id="qr100">—</div>
+            <div class="qc-label">satoshis</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer class="footer">
+      <span>₿ difficultyadjustment.com • Bitcoin intelligence • Prices update on load</span>
+    </footer>
+  </div>
+
+  <script>
+    // ── State ──
+    const SATS_PER_BTC = 100_000_000;
+
+    const currencies = [
+      { id: 'sats', name: 'Satoshis',         code: 'SATS', symbol: 'ṩ',  iconClass: 'sats', iconText: 'ṩ',  rate: null, decimals: 0 },
+      { id: 'usd',  name: 'US Dollar',        code: 'USD',  symbol: '$',  iconClass: 'fiat', iconText: '$',  rate: null, decimals: 2 },
+      { id: 'cad',  name: 'Canadian Dollar',   code: 'CAD',  symbol: 'C$', iconClass: 'fiat', iconText: 'C$', rate: null, decimals: 2 },
+      { id: 'eur',  name: 'Euro',             code: 'EUR',  symbol: '€',  iconClass: 'fiat', iconText: '€',  rate: null, decimals: 2 },
+      { id: 'gbp',  name: 'British Pound',    code: 'GBP',  symbol: '£',  iconClass: 'fiat', iconText: '£',  rate: null, decimals: 2 },
+      { id: 'aud',  name: 'Australian Dollar', code: 'AUD',  symbol: 'A$', iconClass: 'fiat', iconText: 'A$', rate: null, decimals: 2 },
+      { id: 'jpy',  name: 'Japanese Yen',     code: 'JPY',  symbol: '¥',  iconClass: 'fiat', iconText: '¥',  rate: null, decimals: 0 },
+    ];
+
+    // Which currency is primary?  Default: BTC
+    let primaryCurrency = 'btc';
+    let btcPriceUSD = 0;
+
+    // Approximate FX rates (USD-based, updated on load)
+    let fxRates = { usd: 1, cad: 1.36, eur: 0.92, gbp: 0.79, aud: 1.55, jpy: 150.5 };
+
+    // ── DOM refs ──
+    const primaryInput   = document.getElementById('primaryInput');
+    const primaryCard    = document.getElementById('primaryCard');
+    const primaryName    = document.getElementById('primaryName');
+    const primaryCode    = document.getElementById('primaryCode');
+    const primarySubtext = document.getElementById('primarySubtext');
+    const conversionList = document.getElementById('conversionList');
+
+    // ── Build conversion rows ──
+    function buildRows() {
+      conversionList.innerHTML = '';
+      const rowCurrencies = getSecondaryList();
+      rowCurrencies.forEach(c => {
+        const row = document.createElement('div');
+        row.className = 'conversion-row';
+        row.dataset.id = c.id;
+        row.innerHTML = `
+          <div class="row-left">
+            <div class="row-icon currency-icon ${c.iconClass}">${c.iconText}</div>
+            <div class="row-info">
+              <div class="row-name">${c.name}</div>
+              <div class="row-code">${c.code}</div>
+            </div>
+          </div>
+          <div class="row-right">
+            <div class="row-value" data-currency="${c.id}">—</div>
+            <div class="row-unit">${c.code}</div>
+          </div>
+        `;
+        row.addEventListener('click', () => switchPrimary(c.id));
+        conversionList.appendChild(row);
+      });
+    }
+
+    function getSecondaryList() {
+      // Show all currencies except the primary one
+      const all = [
+        { id: 'btc', name: 'Bitcoin', code: 'BTC', symbol: '₿', iconClass: 'btc', iconText: '₿', rate: null, decimals: 8 },
+        ...currencies
+      ];
+      return all.filter(c => c.id !== primaryCurrency);
+    }
+
+    function getCurrencyMeta(id) {
+      if (id === 'btc') return { id: 'btc', name: 'Bitcoin', code: 'BTC', symbol: '₿', iconClass: 'btc', iconText: '₿', decimals: 8 };
+      return currencies.find(c => c.id === id);
+    }
+
+    // ── Convert: given the primary amount, compute BTC, then compute each secondary ──
+    function primaryToBtc(amount) {
+      if (primaryCurrency === 'btc') return amount;
+      if (primaryCurrency === 'sats') return amount / SATS_PER_BTC;
+      // Fiat
+      const fxRate = fxRates[primaryCurrency] || 1;
+      const usdAmount = amount / fxRate;
+      return btcPriceUSD > 0 ? usdAmount / btcPriceUSD : 0;
+    }
+
+    function btcToSecondary(btcAmount, currencyId) {
+      if (currencyId === 'btc') return btcAmount;
+      if (currencyId === 'sats') return btcAmount * SATS_PER_BTC;
+      const fxRate = fxRates[currencyId] || 1;
+      return btcAmount * btcPriceUSD * fxRate;
+    }
+
+    // ── Format number ──
+    function formatNum(val, decimals) {
+      if (val === null || val === undefined || isNaN(val)) return '—';
+      if (Math.abs(val) < 0.000000001) return '0';
+
+      // For sats, use integer with commas
+      if (decimals === 0) {
+        return Math.round(val).toLocaleString('en-US');
+      }
+
+      // For BTC, show up to 8 decimals but trim trailing zeros
+      if (decimals === 8) {
+        let s = val.toFixed(8);
+        // Trim trailing zeros but keep at least 2 decimals
+        s = s.replace(/0+$/, '');
+        if (s.endsWith('.')) s += '00';
+        else if (s.split('.')[1]?.length === 1) s += '0';
+        return parseFloat(s).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 });
+      }
+
+      // For fiat, standard
+      return val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    // ── Update all rows ──
+    function updateConversions() {
+      const amount = parseFloat(primaryInput.value) || 0;
+      const btcAmount = primaryToBtc(amount);
+
+      const secondaries = getSecondaryList();
+      secondaries.forEach(c => {
+        const el = document.querySelector(`.row-value[data-currency="${c.id}"]`);
+        if (!el) return;
+        const val = btcToSecondary(btcAmount, c.id);
+        const meta = getCurrencyMeta(c.id);
+        el.textContent = formatNum(val, meta.decimals);
+      });
+
+      // Update primary subtext
+      updatePrimarySubtext(amount);
+
+      // Update quick reference
+      updateQuickRef();
+    }
+
+    function updatePrimarySubtext(amount) {
+      if (primaryCurrency === 'btc') {
+        if (btcPriceUSD > 0) {
+          primarySubtext.textContent = '≈ $' + formatNum(amount * btcPriceUSD, 2) + ' USD';
+        }
+      } else if (primaryCurrency === 'sats') {
+        const btc = amount / SATS_PER_BTC;
+        primarySubtext.textContent = '≈ ' + formatNum(btc, 8) + ' BTC';
+      } else {
+        const btcAmt = primaryToBtc(amount);
+        primarySubtext.textContent = '≈ ' + formatNum(btcAmt, 8) + ' BTC';
+      }
+    }
+
+    function updateQuickRef() {
+      if (btcPriceUSD <= 0) return;
+      const satsPerDollar = SATS_PER_BTC / btcPriceUSD;
+      document.getElementById('qr1').textContent = formatNum(satsPerDollar * 1, 0);
+      document.getElementById('qr10').textContent = formatNum(satsPerDollar * 10, 0);
+      document.getElementById('qr100').textContent = formatNum(satsPerDollar * 100, 0);
+    }
+
+    // ── Switch primary currency ──
+    function switchPrimary(newId) {
+      // Compute current BTC amount first
+      const currentAmount = parseFloat(primaryInput.value) || 0;
+      const btcAmount = primaryToBtc(currentAmount);
+
+      // Switch
+      primaryCurrency = newId;
+      const meta = getCurrencyMeta(newId);
+
+      // Update primary card appearance
+      primaryName.textContent = meta.name;
+      primaryCode.textContent = meta.code;
+
+      // Update icon
+      const iconEl = primaryCard.querySelector('.currency-icon');
+      iconEl.className = 'currency-icon ' + meta.iconClass;
+      iconEl.textContent = meta.iconText;
+
+      // Set the new value
+      const newVal = btcToSecondary(btcAmount, newId);
+      if (meta.decimals === 0) {
+        primaryInput.value = Math.round(newVal);
+      } else if (meta.decimals === 8) {
+        primaryInput.value = parseFloat(newVal.toFixed(8));
+      } else {
+        primaryInput.value = parseFloat(newVal.toFixed(2));
+      }
+
+      // Rebuild rows and update
+      buildRows();
+      updateConversions();
+    }
+
+    // ── Input handler ──
+    primaryInput.addEventListener('input', updateConversions);
+
+    // ── Fetch prices ──
+    async function fetchPrices() {
+      try {
+        const res = await fetch('/api/prices?vs=usd');
+        const data = await res.json();
+        // Expect: { bitcoin: { usd: 100000, ... } } or similar
+        if (data?.bitcoin?.usd) {
+          btcPriceUSD = data.bitcoin.usd;
+        } else if (data?.btc?.usd) {
+          btcPriceUSD = data.btc.usd;
+        } else if (typeof data?.price === 'number') {
+          btcPriceUSD = data.price;
+        } else if (typeof data?.usd === 'number') {
+          btcPriceUSD = data.usd;
+        }
+      } catch (e) {
+        console.warn('Failed to fetch BTC price, using fallback', e);
+        btcPriceUSD = 97000; // Fallback
+      }
+
+      document.getElementById('btcPriceDisplay').textContent = '$' + btcPriceUSD.toLocaleString('en-US', { maximumFractionDigits: 0 });
+
+      // Try to fetch FX rates
+      try {
+        const fxRes = await fetch('/api/exchange-rate?vs=cad,eur,gbp,aud,jpy');
+        const fxData = await fxRes.json();
+        if (fxData) {
+          // Try multiple response shapes
+          const rateMap = fxData.rates || fxData;
+          if (rateMap.cad) fxRates.cad = rateMap.cad;
+          if (rateMap.eur) fxRates.eur = rateMap.eur;
+          if (rateMap.gbp) fxRates.gbp = rateMap.gbp;
+          if (rateMap.aud) fxRates.aud = rateMap.aud;
+          if (rateMap.jpy) fxRates.jpy = rateMap.jpy;
+          // Also try uppercase
+          if (rateMap.CAD) fxRates.cad = rateMap.CAD;
+          if (rateMap.EUR) fxRates.eur = rateMap.EUR;
+          if (rateMap.GBP) fxRates.gbp = rateMap.GBP;
+          if (rateMap.AUD) fxRates.aud = rateMap.AUD;
+          if (rateMap.JPY) fxRates.jpy = rateMap.JPY;
+        }
+      } catch (e) {
+        console.warn('FX rates fetch failed, using defaults', e);
+      }
+
+      // Also try per-currency fetch as fallback
+      const fxCurrencies = ['cad', 'eur', 'gbp', 'aud', 'jpy'];
+      for (const cur of fxCurrencies) {
+        if (fxRates[cur] === 1 && cur !== 'usd') {
+          try {
+            const r = await fetch(`/api/exchange-rate?vs=${cur}`);
+            const d = await r.json();
+            if (d?.rate) fxRates[cur] = d.rate;
+            else if (d?.[cur]) fxRates[cur] = d[cur];
+            else if (typeof d === 'number') fxRates[cur] = d;
+          } catch (e) { /* use default */ }
+        }
+      }
+
+      updateConversions();
+    }
+
+    // ── Init ──
+    buildRows();
+    fetchPrices();
+  </script>
+</body>
+</html>

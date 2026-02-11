@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>₿ Bitcoin 101 — Difficulty Adjustment</title>
+  <meta name="description" content="Learn about Bitcoin from the ground up. What it is, why it matters, how it works, and how to get started.">
+  <meta name="theme-color" content="#f7931a">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>₿</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    .learn-content {
+      max-width: 820px;
+      margin: 0 auto 60px;
+    }
+
+    .section-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px;
+      margin-bottom: 20px;
+      transition: border-color 0.3s, transform 0.2s;
+    }
+
+    .section-card:hover {
+      border-color: var(--border-light);
+      transform: translateY(-2px);
+    }
+
+    .section-icon {
+      font-size: 32px;
+      margin-bottom: 12px;
+      display: block;
+    }
+
+    .section-card h3 {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      color: var(--text-primary);
+    }
+
+    .section-card h3 .accent { color: var(--accent); }
+
+    .section-card p {
+      font-size: 15px;
+      line-height: 1.8;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+    }
+
+    .section-card p:last-child { margin-bottom: 0; }
+
+    .section-card strong { color: var(--text-primary); font-weight: 600; }
+
+    .section-card .highlight {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .stat-inline {
+      display: inline-block;
+      background: var(--accent-dim);
+      color: var(--accent);
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .myth-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .myth {
+      background: var(--bg-secondary);
+      border-radius: var(--radius-sm);
+      padding: 16px;
+    }
+
+    .myth-claim {
+      font-size: 13px;
+      color: var(--red);
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .myth-truth {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    .myth-truth strong { color: var(--green); }
+
+    .resource-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .resource-link {
+      display: block;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 20px;
+      text-decoration: none;
+      color: inherit;
+      text-align: center;
+      transition: all 0.2s;
+    }
+
+    .resource-link:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+    }
+
+    .resource-link .r-icon { font-size: 28px; margin-bottom: 8px; display: block; }
+    .resource-link .r-name { font-size: 14px; font-weight: 600; color: var(--accent); margin-bottom: 4px; }
+    .resource-link .r-desc { font-size: 12px; color: var(--text-muted); }
+
+    .comparison-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+    }
+
+    .comparison-table th {
+      padding: 12px 16px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      border-bottom: 2px solid var(--border);
+      text-align: left;
+    }
+
+    .comparison-table th:nth-child(2) { color: var(--red); }
+    .comparison-table th:nth-child(3) { color: var(--accent); }
+
+    .comparison-table td {
+      padding: 10px 16px;
+      font-size: 14px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-secondary);
+    }
+
+    .comparison-table td:nth-child(3) { color: var(--text-primary); font-weight: 500; }
+
+    .toc {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 32px;
+      justify-content: center;
+    }
+
+    .toc a {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-decoration: none;
+      padding: 6px 14px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      transition: all 0.2s;
+    }
+
+    .toc a:hover { color: var(--accent); border-color: var(--accent); }
+
+    @media (max-width: 640px) {
+      .myth-grid { grid-template-columns: 1fr; }
+      .resource-grid { grid-template-columns: 1fr; }
+      .section-card { padding: 24px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="header-left">
+        <a href="/">
+          <span class="logo">₿</span>
+          <h1>Difficulty<span class="accent">Adjustment</span></h1>
+        </a>
+      </div>
+      <nav class="site-nav">
+        <a href="/" class="nav-link">Dashboard</a>
+        <a href="/history" class="nav-link">History</a>
+        <a href="/learn" class="nav-link active">Bitcoin 101</a>
+        <a href="/calculator" class="nav-link">Calculator</a>
+      </nav>
+      <div class="header-right"></div>
+    </header>
+
+    <div class="page-hero">
+      <h2>Bitcoin <span class="accent">101</span></h2>
+      <p class="subtitle">Everything you need to understand Bitcoin — from zero to self-sovereignty. No jargon, no hype, just truth.</p>
+    </div>
+
+    <div class="toc">
+      <a href="#what">What is Bitcoin?</a>
+      <a href="#why">Why It Matters</a>
+      <a href="#how">How It Works</a>
+      <a href="#difficulty">Difficulty Adjustment</a>
+      <a href="#halving">The Halving</a>
+      <a href="#vs-fiat">Bitcoin vs Fiat</a>
+      <a href="#started">Getting Started</a>
+      <a href="#myths">Myths Debunked</a>
+      <a href="#lightning">Lightning Network</a>
+      <a href="#resources">Resources</a>
+    </div>
+
+    <div class="learn-content">
+
+      <div class="section-card" id="what">
+        <span class="section-icon">🟠</span>
+        <h3>What is <span class="accent">Bitcoin</span>?</h3>
+        <p>Bitcoin is <strong>digital money that works without banks, governments, or any middleman</strong>. It was created in 2009 by an anonymous person (or group) using the name Satoshi Nakamoto, who published a 9-page whitepaper describing a "peer-to-peer electronic cash system."</p>
+        <p>When you send Bitcoin, your transaction is verified by a global network of computers — not by a bank. No one can freeze your account, reverse your transaction, or inflate your savings away. You are in complete control of your money.</p>
+        <p>There will only ever be <span class="stat-inline">21,000,000 BTC</span> — no more can ever be created. This fixed supply is enforced by math, not by politicians.</p>
+      </div>
+
+      <div class="section-card" id="why">
+        <span class="section-icon">💡</span>
+        <h3>Why Bitcoin <span class="accent">Matters</span></h3>
+        <p><strong>Financial sovereignty.</strong> For the first time in history, anyone with an internet connection can store and send value without asking permission. No bank account required. No government approval needed. No borders.</p>
+        <p><strong>Sound money.</strong> Every dollar you hold loses purchasing power every year. The US dollar has lost over 96% of its value since 1913. Bitcoin's fixed supply of 21 million means it can't be inflated away — it's the hardest money ever created.</p>
+        <p><strong>Censorship resistance.</strong> In many countries, people have their bank accounts frozen for political dissent. Bitcoin can't be seized, censored, or confiscated by any authority. If you hold your own keys, no one can take your bitcoin.</p>
+        <p><strong>Open and verifiable.</strong> Anyone can audit the Bitcoin network. Every transaction ever made is recorded on a public ledger. The code is open source. Trust is replaced by verification.</p>
+      </div>
+
+      <div class="section-card" id="how">
+        <span class="section-icon">⛓️</span>
+        <h3>How Bitcoin <span class="accent">Works</span></h3>
+        <p>Bitcoin runs on a <strong>blockchain</strong> — a chain of blocks, each containing a batch of transactions. Every ~10 minutes, a new block is added to the chain by miners.</p>
+        <p><strong>Miners</strong> are specialized computers that compete to solve a mathematical puzzle (called proof-of-work). The first miner to solve it gets to add the next block and earns a reward in newly created bitcoin. This process secures the network and ensures no one can cheat.</p>
+        <p>Every node (computer running Bitcoin software) independently verifies every transaction and every block. If someone tries to create fake bitcoin or double-spend, the network rejects it instantly. There is no CEO, no headquarters, no single point of failure — just thousands of computers around the world enforcing the same rules.</p>
+        <p>The result: a monetary system that is <strong>trustless</strong> — you don't need to trust anyone, because the math and code enforce the rules for everyone equally.</p>
+      </div>
+
+      <div class="section-card" id="difficulty">
+        <span class="section-icon">⛏️</span>
+        <h3>What is a <span class="accent">Difficulty Adjustment</span>?</h3>
+        <p>This is Bitcoin's most elegant feature — and the namesake of this website.</p>
+        <p>Every <span class="stat-inline">2,016 blocks</span> (roughly every two weeks), the Bitcoin network automatically adjusts how hard it is to mine a block. If blocks were being found too quickly (more miners joined), difficulty goes up. If blocks were too slow (miners left), difficulty goes down.</p>
+        <p><strong>The goal is simple: maintain an average block time of 10 minutes, no matter what.</strong> Whether 10 miners or 10 million miners are competing, Bitcoin self-regulates to keep the same steady heartbeat.</p>
+        <p>This is what makes Bitcoin antifragile. When China banned mining in 2021 and half the network's hashrate disappeared overnight, the difficulty adjusted downward and Bitcoin kept producing blocks. No committee meeting. No emergency action. Just math, doing its job.</p>
+        <p>You can explore every difficulty adjustment in Bitcoin's history on our <a href="/history" style="color:var(--accent)">History page</a>.</p>
+      </div>
+
+      <div class="section-card" id="halving">
+        <span class="section-icon">✂️</span>
+        <h3>The <span class="accent">Halving</span></h3>
+        <p>Every <span class="stat-inline">210,000 blocks</span> (~4 years), the reward miners receive for adding a block is cut in half. This is called the "halving."</p>
+        <p>When Bitcoin launched in 2009, miners earned <strong>50 BTC</strong> per block. After the first halving in 2012, it dropped to 25. Then 12.5 in 2016, 6.25 in 2020, and <strong>3.125 BTC</strong> after the most recent halving in April 2024. The next halving is estimated around <span class="stat-inline">April 2028</span>.</p>
+        <p>This creates a predictable, decreasing supply schedule. By 2140, the last bitcoin will be mined and no new supply will ever enter circulation. Halvings have historically preceded major bull runs — as supply decreases while demand stays the same or grows, the price tends to rise.</p>
+        <p>Unlike government money where politicians can print unlimited amounts, <strong>Bitcoin's monetary policy was set on day one and cannot be changed</strong>.</p>
+      </div>
+
+      <div class="section-card" id="vs-fiat">
+        <span class="section-icon">⚖️</span>
+        <h3>Bitcoin vs <span class="accent">Traditional Money</span></h3>
+        <p>Here's how Bitcoin compares to government-issued (fiat) currency:</p>
+        <table class="comparison-table">
+          <thead>
+            <tr><th>Property</th><th>Fiat (USD, EUR)</th><th>Bitcoin ₿</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Supply</td><td>Unlimited (print at will)</td><td>Hard cap: 21 million</td></tr>
+            <tr><td>Inflation</td><td>2-10%+ per year</td><td>Decreasing toward 0%</td></tr>
+            <tr><td>Control</td><td>Central banks & governments</td><td>No one (decentralized)</td></tr>
+            <tr><td>Censorship</td><td>Accounts can be frozen</td><td>Cannot be censored</td></tr>
+            <tr><td>Transparency</td><td>Opaque (trust the Fed)</td><td>Fully auditable by anyone</td></tr>
+            <tr><td>Settlement</td><td>Days (wires, checks)</td><td>Minutes (on-chain)</td></tr>
+            <tr><td>Borders</td><td>Restricted, regulated</td><td>Borderless, permissionless</td></tr>
+            <tr><td>Counterfeiting</td><td>Possible</td><td>Mathematically impossible</td></tr>
+            <tr><td>History</td><td>Average fiat lifespan: 27 years</td><td>Running since 2009, never hacked</td></tr>
+          </tbody>
+        </table>
+        <p style="margin-top:16px">Since the Federal Reserve was created in 1913, the US dollar has lost over <strong>96% of its purchasing power</strong>. In that same logic, a currency with a fixed supply that cannot be debased isn't just an investment — it's a lifeboat.</p>
+      </div>
+
+      <div class="section-card" id="started">
+        <span class="section-icon">🚀</span>
+        <h3>How to <span class="accent">Get Started</span></h3>
+        <p><strong>Step 1: Learn.</strong> You're doing this right now. Understand what you're buying before you buy it. Bitcoin rewards patience and conviction, not impulsive trading.</p>
+        <p><strong>Step 2: Buy some bitcoin.</strong> Start small. You don't need to buy a whole bitcoin — you can buy as little as a few dollars worth. Popular exchanges include Strike, River, Swan Bitcoin, and Bull Bitcoin (Canada). Avoid shitcoin casinos like Binance.</p>
+        <p><strong>Step 3: Self-custody.</strong> Move your bitcoin off the exchange and onto a hardware wallet you control. Popular options: Coldcard, Trezor, Ledger, BitBox02. The golden rule: <span class="highlight">not your keys, not your coins</span>.</p>
+        <p><strong>Step 4: Stack sats.</strong> Set up recurring purchases (daily, weekly, monthly). This strategy is called Dollar-Cost Averaging (DCA) and removes the stress of trying to time the market. The best time to buy bitcoin was yesterday. The second best time is today.</p>
+        <p><strong>Step 5: Hold.</strong> Bitcoin is volatile in the short term but has outperformed every other asset class over any 4+ year period in its history. Zoom out. Think in decades, not days.</p>
+      </div>
+
+      <div class="section-card" id="myths">
+        <span class="section-icon">🔍</span>
+        <h3>Common <span class="accent">Myths</span> Debunked</h3>
+        <p>You'll hear these objections. Here's why they're wrong:</p>
+        <div class="myth-grid">
+          <div class="myth">
+            <div class="myth-claim">❌ "Bitcoin is too volatile"</div>
+            <div class="myth-truth"><strong>Truth:</strong> Volatility is the price of returns. Bitcoin has been the best-performing asset of the last 15 years. Zoom out beyond the daily noise — every 4-year cycle has set new all-time highs. Volatility decreases as adoption grows.</div>
+          </div>
+          <div class="myth">
+            <div class="myth-claim">❌ "It's used by criminals"</div>
+            <div class="myth-truth"><strong>Truth:</strong> The US dollar is used in far more criminal activity than Bitcoin. Bitcoin's transparent blockchain actually makes it easier to trace illicit transactions. The FBI loves blockchain forensics.</div>
+          </div>
+          <div class="myth">
+            <div class="myth-claim">❌ "It wastes energy"</div>
+            <div class="myth-truth"><strong>Truth:</strong> Bitcoin mining increasingly uses renewable and stranded energy that would otherwise be wasted. Over 50% of mining is powered by renewables. The real question: is securing a global monetary system worth energy? We spend far more powering Christmas lights.</div>
+          </div>
+          <div class="myth">
+            <div class="myth-claim">❌ "It's too late to buy"</div>
+            <div class="myth-truth"><strong>Truth:</strong> People have said this at $1, $100, $1,000, $10,000, and $100,000. Bitcoin's total addressable market is global money — over $100 trillion. We're still early. Less than 5% of the world owns bitcoin.</div>
+          </div>
+          <div class="myth">
+            <div class="myth-claim">❌ "Governments will ban it"</div>
+            <div class="myth-truth"><strong>Truth:</strong> The US, EU, and most major nations are embracing Bitcoin through regulation, not banning it. El Salvador made it legal tender. Bitcoin ETFs trade on Wall Street. The genie is out of the bottle.</div>
+          </div>
+          <div class="myth">
+            <div class="myth-claim">❌ "Another crypto will replace it"</div>
+            <div class="myth-truth"><strong>Truth:</strong> Bitcoin's network effect, security (highest hashrate in history), and immaculate conception (no founder, no premine, no VC backing) make it irreplaceable. There is no second best.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-card" id="lightning">
+        <span class="section-icon">⚡</span>
+        <h3>The <span class="accent">Lightning</span> Network</h3>
+        <p>Bitcoin's base layer processes ~7 transactions per second (by design — security over speed). The <strong>Lightning Network</strong> is a "Layer 2" protocol built on top of Bitcoin that enables:</p>
+        <p><strong>Instant payments</strong> — transactions settle in milliseconds, not minutes. <strong>Micropayments</strong> — send fractions of a penny with near-zero fees. <strong>Scalability</strong> — millions of transactions per second without touching the base layer.</p>
+        <p>Lightning works by opening payment "channels" between users. Transactions happen off-chain instantly, and channels can be closed to settle back on the Bitcoin blockchain anytime. It's like running a bar tab — you settle up at the end, not with every drink.</p>
+        <p>Apps like Strike, Wallet of Satoshi, and Phoenix make Lightning payments as easy as sending a text. Many merchants, especially in El Salvador, accept Lightning payments every day.</p>
+      </div>
+
+      <div class="section-card" id="resources">
+        <span class="section-icon">📚</span>
+        <h3><span class="accent">Resources</span> to Go Deeper</h3>
+        <p>Don't trust. Verify. Here are the best places to continue learning:</p>
+        <div class="resource-grid">
+          <a href="https://bitcoin.org/en/" target="_blank" rel="noopener" class="resource-link">
+            <span class="r-icon">🌐</span>
+            <div class="r-name">bitcoin.org</div>
+            <div class="r-desc">Official getting started guide</div>
+          </a>
+          <a href="https://mempool.space" target="_blank" rel="noopener" class="resource-link">
+            <span class="r-icon">🔍</span>
+            <div class="r-name">mempool.space</div>
+            <div class="r-desc">Explore the blockchain live</div>
+          </a>
+          <a href="https://www.lopp.net/bitcoin-information.html" target="_blank" rel="noopener" class="resource-link">
+            <span class="r-icon">🗺️</span>
+            <div class="r-name">Lopp.net</div>
+            <div class="r-desc">Comprehensive Bitcoin info hub</div>
+          </a>
+          <a href="https://nakamotoinstitute.org/library/" target="_blank" rel="noopener" class="resource-link">
+            <span class="r-icon">📜</span>
+            <div class="r-name">Nakamoto Institute</div>
+            <div class="r-desc">Essential Bitcoin literature</div>
+          </a>
+          <a href="https://hope.com" target="_blank" rel="noopener" class="resource-link">
+            <span class="r-icon">📖</span>
+            <div class="r-name">hope.com</div>
+            <div class="r-desc">The Bitcoin whitepaper explained</div>
+          </a>
+          <a href="/" class="resource-link">
+            <span class="r-icon">₿</span>
+            <div class="r-name">Our Dashboard</div>
+            <div class="r-desc">Live Bitcoin intelligence data</div>
+          </a>
+        </div>
+      </div>
+
+    </div>
+
+    <footer class="footer">
+      <span>₿ difficultyadjustment.com • There is no second best. • Learn Bitcoin. Hold Bitcoin. Use Bitcoin.</span>
+    </footer>
+  </div>
+</body>
+</html>

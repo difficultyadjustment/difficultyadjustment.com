@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>₿ Cost to Attack Bitcoin — Difficulty Adjustment</title>
+  <meta name="description" content="How much would it cost to 51% attack the Bitcoin network right now? Spoiler: more than most countries' GDP.">
+  <meta name="theme-color" content="#f7931a">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>₿</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    .attack-content { max-width: 900px; margin: 0 auto 60px; }
+    .hero-cost { text-align: center; background: var(--bg-card); border: 1px solid rgba(239,68,68,0.3); border-radius: var(--radius); padding: 48px 32px; margin-bottom: 32px; background: linear-gradient(135deg, rgba(239,68,68,0.05), var(--bg-card) 60%); }
+    .hero-cost .label { font-size: 13px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; }
+    .hero-cost .amount { font-size: 48px; font-weight: 900; font-family: 'JetBrains Mono', monospace; color: #ef4444; margin-bottom: 8px; }
+    .hero-cost .note { font-size: 14px; color: var(--text-secondary); }
+    .breakdown { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 32px; }
+    .break-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; }
+    .break-card .step { font-size: 11px; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-weight: 700; }
+    .break-card h4 { font-size: 16px; margin-bottom: 8px; }
+    .break-card .calc { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-secondary); line-height: 1.8; }
+    .break-card .result { font-size: 22px; font-weight: 800; font-family: 'JetBrains Mono', monospace; color: var(--accent); margin-top: 12px; }
+    .context-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 32px; }
+    .ctx-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; text-align: center; }
+    .ctx-card .icon { font-size: 36px; margin-bottom: 12px; }
+    .ctx-card h4 { font-size: 14px; margin-bottom: 8px; }
+    .ctx-card p { font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
+    .live-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+    .live-stat { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; text-align: center; }
+    .live-stat .label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+    .live-stat .val { font-size: 18px; font-weight: 700; font-family: 'JetBrains Mono', monospace; margin-top: 6px; color: var(--accent); }
+    .why-harder { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 32px; }
+    .why-harder h3 { font-size: 18px; margin-bottom: 16px; }
+    .why-harder ul { list-style: none; }
+    .why-harder li { padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-secondary); line-height: 1.6; }
+    .why-harder li:last-child { border-bottom: none; }
+    .why-harder li strong { color: var(--text-primary); }
+    .why-harder li .emoji { margin-right: 8px; }
+    @media (max-width: 768px) { .breakdown { grid-template-columns: 1fr; } .context-grid { grid-template-columns: 1fr; } .live-stats { grid-template-columns: repeat(2, 1fr); } .hero-cost .amount { font-size: 32px; } }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="header-left"><a href="/"><span class="logo">₿</span><h1>Difficulty<span class="accent">Adjustment</span></h1></a></div>
+      <nav class="site-nav">
+        <a href="/" class="nav-link">Dashboard</a>
+        <a href="/history" class="nav-link">History</a>
+        <a href="/learn" class="nav-link">Bitcoin 101</a>
+        <a href="/attack" class="nav-link active">51% Attack</a>
+        <a href="/calculator" class="nav-link">Mining Calc</a>
+      </nav>
+      <div class="header-right"></div>
+    </header>
+    <div class="page-hero">
+      <h2>Cost to <span class="accent">Attack</span> Bitcoin</h2>
+      <p class="subtitle">How much would it cost to 51% attack the most secure computer network in human history?</p>
+    </div>
+    <div class="attack-content">
+      <div class="hero-cost">
+        <div class="label">Estimated First-Year 51% Attack Cost</div>
+        <div class="amount" id="totalCost">Loading...</div>
+        <div class="note">And it still probably wouldn't work.</div>
+      </div>
+      <div class="live-stats">
+        <div class="live-stat"><div class="label">Network Hashrate</div><div class="val" id="liveHash">--</div></div>
+        <div class="live-stat"><div class="label">Difficulty</div><div class="val" id="liveDiff">--</div></div>
+        <div class="live-stat"><div class="label">Block Height</div><div class="val" id="liveHeight">--</div></div>
+        <div class="live-stat"><div class="label">ASICs Required</div><div class="val" id="liveAsics">--</div></div>
+      </div>
+      <div class="breakdown">
+        <div class="break-card">
+          <div class="step">Step 1</div>
+          <h4>Hardware Required</h4>
+          <div class="calc">
+            51% of network hashrate<br>
+            Reference: Antminer S21<br>
+            198 TH/s per unit @ ~$5,000<br>
+            <span id="calcHw"></span>
+          </div>
+          <div class="result" id="hwCost">--</div>
+        </div>
+        <div class="break-card">
+          <div class="step">Step 2</div>
+          <h4>Annual Electricity</h4>
+          <div class="calc">
+            Each S21 draws 3,450W<br>
+            Running 24/7/365<br>
+            @ $0.06/kWh average<br>
+            <span id="calcElec"></span>
+          </div>
+          <div class="result" id="elecCost">--</div>
+        </div>
+        <div class="break-card">
+          <div class="step">Step 3</div>
+          <h4>Infrastructure & Cooling</h4>
+          <div class="calc">
+            Data center construction<br>
+            Cooling systems (30% overhead)<br>
+            Networking, staff, security<br>
+            Estimated 20% of hardware cost
+          </div>
+          <div class="result" id="infraCost">--</div>
+        </div>
+        <div class="break-card">
+          <div class="step">Total</div>
+          <h4>First-Year Attack Cost</h4>
+          <div class="calc">
+            Hardware + Electricity +<br>
+            Infrastructure + Cooling<br>
+            <br>
+            <strong style="color:var(--red)">And the attack would crash BTC price, destroying the value of what you stole.</strong>
+          </div>
+          <div class="result" id="totalBreak" style="color:#ef4444">--</div>
+        </div>
+      </div>
+      <div class="context-grid">
+        <div class="ctx-card">
+          <div class="icon">🏭</div>
+          <h4>Manufacturing Time</h4>
+          <p id="ctxManufacture">At current global ASIC production rates (~500,000 units/year), it would take <strong>X years</strong> just to build enough machines.</p>
+        </div>
+        <div class="ctx-card">
+          <div class="icon">⚡</div>
+          <h4>Electricity Equivalent</h4>
+          <p id="ctxElectricity">The power draw would be equivalent to <strong>X</strong>, requiring dedicated power plants.</p>
+        </div>
+        <div class="ctx-card">
+          <div class="icon">💰</div>
+          <h4>GDP Comparison</h4>
+          <p id="ctxGdp">The total cost exceeds the GDP of <strong>X</strong>. You'd need a nation-state budget to even attempt this.</p>
+        </div>
+      </div>
+      <div class="why-harder">
+        <h3>🛡️ Why It's Actually Even Harder Than This</h3>
+        <ul>
+          <li><span class="emoji">📉</span><strong>Price crash.</strong> The moment a 51% attack is detected, Bitcoin's price would plummet. The attacker's stolen coins become worthless — they'd be attacking a network they just destroyed.</li>
+          <li><span class="emoji">🏭</span><strong>Supply chain.</strong> You can't just buy millions of ASICs. There aren't enough to buy. Bitmain's entire annual production wouldn't come close. You'd need to build your own chip fabs.</li>
+          <li><span class="emoji">⚡</span><strong>Power grid.</strong> No single power grid could handle this load. You'd need to build dedicated power plants. This takes years, not weeks.</li>
+          <li><span class="emoji">🔄</span><strong>Difficulty adjusts.</strong> If you somehow got 51% of the network, the difficulty would adjust upward, requiring even MORE hashrate to maintain your attack.</li>
+          <li><span class="emoji">👥</span><strong>Social consensus.</strong> Even if you succeeded, Bitcoin node operators could simply reject your chain via a software update. The honest chain would continue. Your attack achieves nothing.</li>
+          <li><span class="emoji">🎯</span><strong>What can you actually do?</strong> A 51% attack only lets you double-spend YOUR OWN coins and prevent others' transactions from confirming. You can't steal anyone's coins or create new ones. The reward doesn't justify the cost.</li>
+        </ul>
+      </div>
+    </div>
+    <footer class="footer"><span>₿ difficultyadjustment.com • Bitcoin: too expensive to attack, too important to ignore.</span></footer>
+  </div>
+  <script>
+    async function loadData() {
+      try {
+        var res = await fetch('/api/mining');
+        var data = await res.json();
+        if (!data.hashrate) return;
+
+        var networkHashEH = data.hashrate; // EH/s
+        var networkHashTH = networkHashEH * 1e6; // TH/s
+        var requiredTH = networkHashTH * 0.51;
+
+        // Antminer S21 specs
+        var asicTH = 198;
+        var asicPrice = 5000;
+        var asicWatts = 3450;
+        var elecRate = 0.06; // $/kWh
+
+        var unitsNeeded = Math.ceil(requiredTH / asicTH);
+        var hardwareCost = unitsNeeded * asicPrice;
+        var annualElec = unitsNeeded * asicWatts / 1000 * 24 * 365 * elecRate;
+        var infraCost = hardwareCost * 0.2;
+        var totalCost = hardwareCost + annualElec + infraCost;
+        var totalPowerGW = (unitsNeeded * asicWatts) / 1e9;
+
+        // Display
+        document.getElementById('liveHash').textContent = networkHashEH.toFixed(1) + ' EH/s';
+        document.getElementById('liveDiff').textContent = (data.difficulty || 0).toFixed(1) + ' T';
+        document.getElementById('liveHeight').textContent = (data.blockHeight || 0).toLocaleString();
+        document.getElementById('liveAsics').textContent = unitsNeeded.toLocaleString();
+
+        document.getElementById('totalCost').textContent = '$' + (totalCost / 1e9).toFixed(1) + ' Billion';
+        document.getElementById('hwCost').textContent = '$' + (hardwareCost / 1e9).toFixed(1) + 'B';
+        document.getElementById('elecCost').textContent = '$' + (annualElec / 1e9).toFixed(2) + 'B/yr';
+        document.getElementById('infraCost').textContent = '$' + (infraCost / 1e9).toFixed(2) + 'B';
+        document.getElementById('totalBreak').textContent = '$' + (totalCost / 1e9).toFixed(1) + ' Billion';
+
+        document.getElementById('calcHw').innerHTML = requiredTH.toLocaleString(undefined,{maximumFractionDigits:0}) + ' TH/s needed<br>' + unitsNeeded.toLocaleString() + ' ASICs × $5,000';
+        document.getElementById('calcElec').innerHTML = unitsNeeded.toLocaleString() + ' units × 3,450W<br>' + totalPowerGW.toFixed(1) + ' GW continuous draw';
+
+        // Context
+        var mfgYears = (unitsNeeded / 500000).toFixed(1);
+        document.getElementById('ctxManufacture').innerHTML = 'At current global ASIC production rates (~500,000 units/year), it would take <strong>' + mfgYears + ' years</strong> just to manufacture enough machines.';
+
+        var powerComparison = totalPowerGW < 5 ? totalPowerGW.toFixed(1) + ' GW — comparable to a small country' : totalPowerGW.toFixed(0) + ' GW — more than most nations consume';
+        document.getElementById('ctxElectricity').innerHTML = 'The attack would draw <strong>' + powerComparison + '</strong>. For reference, all of New York City uses about 11 GW.';
+
+        var countries = [];
+        if (totalCost > 400e9) countries.push('Norway, Ireland, and New Zealand combined');
+        else if (totalCost > 100e9) countries.push('Kenya, Luxembourg, and Iceland combined');
+        else countries.push('many island nations');
+        document.getElementById('ctxGdp').innerHTML = 'The total first-year cost of <strong>$' + (totalCost/1e9).toFixed(1) + 'B</strong> exceeds the annual GDP of <strong>' + countries[0] + '</strong>.';
+
+      } catch(e) { console.error('Failed to load mining data'); }
+    }
+    loadData();
+  </script>
+</body>
+</html>

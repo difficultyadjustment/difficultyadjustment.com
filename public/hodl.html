@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>₿ HODL Calculator — Difficulty Adjustment</title>
+  <meta name="description" content="If you bought Bitcoin on any date and held until today... see your returns instantly.">
+  <meta name="theme-color" content="#f7931a">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>₿</text></svg>">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    .hodl-content { max-width: 900px; margin: 0 auto 60px; }
+    .input-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 32px; margin-bottom: 24px; }
+    .input-row { display: flex; gap: 16px; align-items: end; flex-wrap: wrap; }
+    .input-group { flex: 1; min-width: 180px; }
+    .input-group label { display: block; font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px; font-weight: 600; }
+    .input-group input { width: 100%; background: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-primary); padding: 12px 14px; border-radius: var(--radius-sm); font-size: 14px; font-family: 'JetBrains Mono', monospace; outline: none; }
+    .input-group input:focus { border-color: var(--accent); }
+    .calc-btn { padding: 12px 32px; background: linear-gradient(135deg, #f7931a, #e2711d); border: none; border-radius: var(--radius-sm); color: #000; font-size: 14px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+    .calc-btn:hover { opacity: 0.9; }
+    .hero-result { text-align: center; background: var(--bg-card); border: 1px solid rgba(247,147,26,0.3); border-radius: var(--radius); padding: 40px; margin-bottom: 24px; background: linear-gradient(135deg, rgba(247,147,26,0.05), var(--bg-card) 60%); display: none; }
+    .hero-result.visible { display: block; }
+    .hero-result .original { font-size: 16px; color: var(--text-muted); margin-bottom: 8px; }
+    .hero-result .current { font-size: 44px; font-weight: 900; font-family: 'JetBrains Mono', monospace; color: var(--accent); }
+    .hero-result .multiplier { font-size: 20px; font-weight: 700; margin-top: 8px; }
+    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+    .stat-box { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; text-align: center; }
+    .stat-box .label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+    .stat-box .val { font-size: 18px; font-weight: 700; font-family: 'JetBrains Mono', monospace; margin-top: 6px; }
+    .chart-wrap { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; height: 350px; margin-bottom: 32px; }
+    .hodl-record { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 32px; }
+    .hodl-record h3 { font-size: 18px; margin-bottom: 16px; }
+    .record-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+    .record-item { background: var(--bg-secondary); border-radius: var(--radius-sm); padding: 16px; text-align: center; }
+    .record-item .date { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+    .record-item .price { font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; font-family: 'JetBrains Mono', monospace; }
+    .record-item .ret { font-size: 18px; font-weight: 800; font-family: 'JetBrains Mono', monospace; color: #22c55e; }
+    .record-item .ret.neg { color: #ef4444; }
+    .hodl-truth { text-align: center; font-size: 15px; color: var(--accent); font-weight: 600; padding: 16px; border-top: 1px solid var(--border); margin-top: 16px; }
+    .positive { color: #22c55e; }
+    .negative { color: #ef4444; }
+    @media (max-width: 768px) { .stats-row { grid-template-columns: repeat(2, 1fr); } .record-grid { grid-template-columns: repeat(2, 1fr); } .hero-result .current { font-size: 32px; } }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="header-left"><a href="/"><span class="logo">₿</span><h1>Difficulty<span class="accent">Adjustment</span></h1></a></div>
+      <nav class="site-nav">
+        <a href="/" class="nav-link">Dashboard</a>
+        <a href="/history" class="nav-link">History</a>
+        <a href="/learn" class="nav-link">Bitcoin 101</a>
+        <a href="/hodl" class="nav-link active">HODL Calc</a>
+        <a href="/calculator" class="nav-link">Mining Calc</a>
+      </nav>
+      <div class="header-right"></div>
+    </header>
+    <div class="page-hero">
+      <h2>HODL <span class="accent">Calculator</span></h2>
+      <p class="subtitle">If you bought Bitcoin on any date and held until today...</p>
+    </div>
+    <div class="hodl-content">
+      <div class="input-card">
+        <div class="input-row">
+          <div class="input-group">
+            <label>Purchase Date</label>
+            <input type="date" id="buyDate" value="2020-01-01">
+          </div>
+          <div class="input-group">
+            <label>Amount Invested (USD)</label>
+            <input type="number" id="buyAmount" value="1000" min="1" step="100">
+          </div>
+          <button class="calc-btn" onclick="calculate()">Calculate</button>
+        </div>
+      </div>
+      <div class="hero-result" id="heroResult">
+        <div class="original" id="origText">Your $1,000 invested on Jan 1, 2020</div>
+        <div class="current" id="currentVal">--</div>
+        <div class="multiplier" id="multiplier">--</div>
+      </div>
+      <div class="stats-row" id="statsRow" style="display:none">
+        <div class="stat-box"><div class="label">Profit</div><div class="val" id="sProfit">--</div></div>
+        <div class="stat-box"><div class="label">BTC Purchased</div><div class="val" id="sBtc" style="color:var(--accent)">--</div></div>
+        <div class="stat-box"><div class="label">Price Then</div><div class="val" id="sThen">--</div></div>
+        <div class="stat-box"><div class="label">Price Now</div><div class="val" id="sNow">--</div></div>
+      </div>
+      <div class="chart-wrap" id="chartWrap" style="display:none"><canvas id="hodlChart"></canvas></div>
+      <div class="hodl-record">
+        <h3>📊 The HODL Record</h3>
+        <div class="record-grid" id="recordGrid"></div>
+        <div class="hodl-truth">Every person who bought Bitcoin and held for 4+ years is in profit. Every single one.</div>
+      </div>
+    </div>
+    <footer class="footer"><span>₿ difficultyadjustment.com • Time in the market beats timing the market.</span></footer>
+  </div>
+  <script>
+    var priceData = null;
+    var hodlChart = null;
+    var currentPrice = 0;
+
+    async function loadPrices() {
+      try {
+        var res = await fetch('/api/chart-long/max');
+        var data = await res.json();
+        if (data.prices) {
+          priceData = data.prices;
+          currentPrice = priceData[priceData.length - 1][1];
+          buildRecord();
+        }
+      } catch(e) {}
+      try {
+        var res2 = await fetch('/api/prices');
+        var d2 = await res2.json();
+        if (Array.isArray(d2)) {
+          var btc = d2.find(function(c) { return c.id === 'bitcoin'; });
+          if (btc) currentPrice = btc.current_price;
+        }
+      } catch(e) {}
+    }
+
+    function getPriceAt(targetMs) {
+      if (!priceData) return null;
+      var closest = priceData[0], minDiff = Math.abs(priceData[0][0] - targetMs);
+      for (var i = 1; i < priceData.length; i++) {
+        var diff = Math.abs(priceData[i][0] - targetMs);
+        if (diff < minDiff) { minDiff = diff; closest = priceData[i]; }
+      }
+      return closest[1];
+    }
+
+    function calculate() {
+      if (!priceData || !currentPrice) { alert('Loading prices...'); return; }
+      var dateStr = document.getElementById('buyDate').value;
+      var amount = parseFloat(document.getElementById('buyAmount').value) || 1000;
+      if (!dateStr) return;
+
+      var buyDate = new Date(dateStr + 'T00:00:00');
+      var buyPrice = getPriceAt(buyDate.getTime());
+      if (!buyPrice) return;
+
+      var btcBought = amount / buyPrice;
+      var currentVal = btcBought * currentPrice;
+      var profit = currentVal - amount;
+      var pctReturn = (profit / amount) * 100;
+      var multiplier = currentVal / amount;
+
+      // Display
+      document.getElementById('heroResult').classList.add('visible');
+      document.getElementById('statsRow').style.display = 'grid';
+      document.getElementById('chartWrap').style.display = 'block';
+
+      var dateFormatted = buyDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      document.getElementById('origText').textContent = 'Your $' + amount.toLocaleString() + ' invested on ' + dateFormatted;
+      document.getElementById('currentVal').textContent = '$' + Math.round(currentVal).toLocaleString();
+      var multEl = document.getElementById('multiplier');
+      multEl.textContent = multiplier.toFixed(1) + 'x return (' + (pctReturn >= 0 ? '+' : '') + pctReturn.toFixed(1) + '%)';
+      multEl.className = 'multiplier ' + (profit >= 0 ? 'positive' : 'negative');
+
+      var profitEl = document.getElementById('sProfit');
+      profitEl.textContent = (profit >= 0 ? '+$' : '-$') + Math.abs(Math.round(profit)).toLocaleString();
+      profitEl.className = 'val ' + (profit >= 0 ? 'positive' : 'negative');
+      document.getElementById('sBtc').textContent = btcBought.toFixed(6);
+      document.getElementById('sThen').textContent = '$' + Math.round(buyPrice).toLocaleString();
+      document.getElementById('sNow').textContent = '$' + Math.round(currentPrice).toLocaleString();
+
+      // Chart
+      renderChart(buyDate.getTime(), amount, btcBought);
+    }
+
+    function renderChart(buyMs, amount, btcBought) {
+      var ctx = document.getElementById('hodlChart').getContext('2d');
+      if (hodlChart) hodlChart.destroy();
+      var labels = [], values = [], invested = [];
+      for (var i = 0; i < priceData.length; i++) {
+        if (priceData[i][0] >= buyMs) {
+          labels.push(new Date(priceData[i][0]));
+          values.push(btcBought * priceData[i][1]);
+          invested.push(amount);
+        }
+      }
+      hodlChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            { label: 'Portfolio Value', data: values, borderColor: '#f7931a', borderWidth: 2, backgroundColor: 'rgba(247,147,26,0.1)', fill: true, tension: 0.3, pointRadius: 0 },
+            { label: 'Original Investment', data: invested, borderColor: '#64748b', borderWidth: 2, borderDash: [6,4], backgroundColor: 'transparent', tension: 0, pointRadius: 0 }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          scales: {
+            x: { type: 'time', grid: { display: false }, ticks: { maxTicksLimit: 8, font: { size: 11 } } },
+            y: { grid: { color: '#25253020' }, ticks: { callback: function(v) { return '$' + (v >= 1000 ? (v/1000).toFixed(0) + 'K' : Math.round(v)); }, font: { size: 11, family: "'JetBrains Mono'" } } }
+          },
+          plugins: { legend: { display: true, labels: { color: '#94a3b8' } }, tooltip: { backgroundColor: '#16161f', callbacks: { label: function(ctx) { return ctx.dataset.label + ': $' + Math.round(ctx.parsed.y).toLocaleString(); } } } }
+        }
+      });
+    }
+
+    function buildRecord() {
+      var entries = [
+        { label: 'Jan 2015', date: '2015-01-01' },
+        { label: 'Jan 2017', date: '2017-01-01' },
+        { label: 'Jan 2018', date: '2018-01-01' },
+        { label: 'Jan 2020', date: '2020-01-01' },
+        { label: 'Jan 2021', date: '2021-01-01' },
+        { label: 'Jan 2022', date: '2022-01-01' },
+        { label: 'Jan 2023', date: '2023-01-01' },
+        { label: 'Jan 2024', date: '2024-01-01' },
+      ];
+      var grid = document.getElementById('recordGrid');
+      grid.innerHTML = entries.map(function(e) {
+        var price = getPriceAt(new Date(e.date + 'T00:00:00').getTime());
+        if (!price) return '';
+        var ret = ((currentPrice - price) / price * 100);
+        var cls = ret >= 0 ? '' : ' neg';
+        return '<div class="record-item">' +
+          '<div class="date">' + e.label + '</div>' +
+          '<div class="price">$' + Math.round(price).toLocaleString() + '</div>' +
+          '<div class="ret' + cls + '">' + (ret >= 0 ? '+' : '') + ret.toFixed(0) + '%</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    loadPrices();
+  </script>
+</body>
+</html>

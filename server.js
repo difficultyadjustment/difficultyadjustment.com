@@ -99,6 +99,30 @@ app.get('/calculator', (req, res) => {
   res.sendFile('calculator.html', { root: path.join(__dirname, 'public') });
 });
 
+app.get('/learn', (req, res) => {
+  res.sendFile('learn.html', { root: path.join(__dirname, 'public') });
+});
+
+app.get('/dca', (req, res) => {
+  res.sendFile('dca.html', { root: path.join(__dirname, 'public') });
+});
+
+app.get('/converter', (req, res) => {
+  res.sendFile('converter.html', { root: path.join(__dirname, 'public') });
+});
+
+app.get('/attack', (req, res) => {
+  res.sendFile('attack.html', { root: path.join(__dirname, 'public') });
+});
+
+app.get('/inflation', (req, res) => {
+  res.sendFile('inflation.html', { root: path.join(__dirname, 'public') });
+});
+
+app.get('/hodl', (req, res) => {
+  res.sendFile('hodl.html', { root: path.join(__dirname, 'public') });
+});
+
 // ===== API ROUTES =====
 
 // In-memory cache to avoid hammering free APIs

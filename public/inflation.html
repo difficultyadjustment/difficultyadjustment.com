@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>₿ Bitcoin vs Inflation — Difficulty Adjustment</title>
+  <meta name="description" content="Compare holding US Dollars vs Bitcoin over any time period. See how inflation erodes purchasing power while Bitcoin grows.">
+  <meta property="og:title" content="Bitcoin vs Inflation Calculator — Difficulty Adjustment">
+  <meta property="og:description" content="Compare holding US Dollars vs Bitcoin. See the devastating impact of inflation on your savings.">
+  <meta property="og:type" content="website">
+  <meta name="theme-color" content="#f7931a">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>₿</text></svg>">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    /* ===== Page-specific styles ===== */
+
+    .input-card {
+      max-width: 600px;
+      margin: 0 auto 40px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px;
+    }
+
+    .input-card h3 {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 24px;
+      color: var(--text-primary);
+      text-align: center;
+    }
+
+    .input-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
+    .input-group label {
+      display: block;
+      font-size: 12px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+
+    .input-group input,
+    .input-group select {
+      width: 100%;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      padding: 14px 16px;
+      border-radius: var(--radius-sm);
+      font-size: 16px;
+      font-family: 'JetBrains Mono', monospace;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .input-group input:focus,
+    .input-group select:focus {
+      border-color: var(--accent);
+    }
+
+    .input-group select option {
+      background: var(--bg-primary);
+      color: var(--text-primary);
+    }
+
+    .calc-btn {
+      width: 100%;
+      padding: 16px;
+      background: var(--btc-gradient);
+      border: none;
+      border-radius: var(--radius-sm);
+      color: #fff;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      letter-spacing: 0.5px;
+      font-family: 'Inter', sans-serif;
+    }
+
+    .calc-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 24px rgba(247, 147, 26, 0.35);
+    }
+
+    .calc-btn:active {
+      transform: translateY(0);
+    }
+
+    /* Results Section */
+    .results-section {
+      display: none;
+      max-width: 900px;
+      margin: 0 auto 48px;
+      animation: fadeInUp 0.5s ease;
+    }
+
+    .results-section.visible {
+      display: block;
+    }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Comparison Cards */
+    .comparison-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-bottom: 32px;
+    }
+
+    .comparison-card {
+      border-radius: var(--radius);
+      padding: 28px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .comparison-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+    }
+
+    /* USD Card - Red tinted */
+    .card-usd {
+      background: linear-gradient(180deg, rgba(239, 68, 68, 0.08) 0%, var(--bg-card) 40%);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+    }
+
+    .card-usd::before {
+      background: linear-gradient(90deg, #ef4444, #dc2626);
+    }
+
+    .card-usd .card-icon {
+      color: #ef4444;
+    }
+
+    /* BTC Card - Orange tinted */
+    .card-btc {
+      background: linear-gradient(180deg, rgba(247, 147, 26, 0.08) 0%, var(--bg-card) 40%);
+      border: 1px solid rgba(247, 147, 26, 0.2);
+    }
+
+    .card-btc::before {
+      background: var(--btc-gradient);
+    }
+
+    .card-btc .card-icon {
+      color: var(--accent);
+    }
+
+    .comparison-card .card-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 24px;
+    }
+
+    .comparison-card .card-title .card-icon {
+      font-size: 24px;
+    }
+
+    .comparison-card .card-title h3 {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .stat-row:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .stat-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 15px;
+      font-weight: 600;
+      text-align: right;
+    }
+
+    .stat-value.negative {
+      color: var(--red);
+    }
+
+    .stat-value.positive {
+      color: var(--green);
+    }
+
+    .stat-value.accent {
+      color: var(--accent);
+    }
+
+    .big-number {
+      font-size: 28px;
+      font-weight: 800;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: -1px;
+      margin-top: 8px;
+    }
+
+    .big-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-top: 16px;
+    }
+
+    /* Chart */
+    .chart-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+      margin-bottom: 32px;
+    }
+
+    .chart-card h3 {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 20px;
+    }
+
+    .chart-container {
+      position: relative;
+      height: 360px;
+    }
+
+    /* Verdict / Bottom Statement */
+    .verdict-card {
+      background: linear-gradient(135deg, rgba(247, 147, 26, 0.06) 0%, rgba(239, 68, 68, 0.04) 100%);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 40px;
+      text-align: center;
+    }
+
+    .verdict-card .verdict-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+
+    .verdict-card h3 {
+      font-size: 22px;
+      font-weight: 800;
+      margin-bottom: 12px;
+      letter-spacing: -0.5px;
+    }
+
+    .verdict-card p {
+      font-size: 15px;
+      color: var(--text-secondary);
+      line-height: 1.7;
+      max-width: 640px;
+      margin: 0 auto;
+    }
+
+    .verdict-card .highlight {
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    .verdict-card .loss-highlight {
+      color: var(--red);
+      font-weight: 700;
+    }
+
+    /* Multiplier badge */
+    .multiplier-badge {
+      display: inline-block;
+      background: var(--accent-dim);
+      color: var(--accent);
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 14px;
+      margin-top: 12px;
+    }
+
+    /* Mobile */
+    @media (max-width: 768px) {
+      .input-grid {
+        grid-template-columns: 1fr;
+      }
+      .comparison-grid {
+        grid-template-columns: 1fr;
+      }
+      .input-card {
+        padding: 24px 20px;
+      }
+      .comparison-card {
+        padding: 24px 20px;
+      }
+      .big-number {
+        font-size: 22px;
+      }
+      .chart-container {
+        height: 280px;
+      }
+      .verdict-card {
+        padding: 28px 20px;
+      }
+      .verdict-card h3 {
+        font-size: 18px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .stat-value {
+        font-size: 13px;
+      }
+      .stat-label {
+        font-size: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <a href="/">
+          <span class="logo">₿</span>
+          <h1>Difficulty<span class="accent">Adjustment</span></h1>
+        </a>
+      </div>
+      <nav class="site-nav">
+        <a href="/" class="nav-link">Dashboard</a>
+        <a href="/history" class="nav-link">History</a>
+        <a href="/learn" class="nav-link">Bitcoin 101</a>
+        <a href="/calculator" class="nav-link">Calculator</a>
+        <a href="/inflation" class="nav-link active">Inflation</a>
+      </nav>
+    </header>
+
+    <!-- Hero -->
+    <section class="page-hero">
+      <h2>Bitcoin vs <span class="accent">Inflation</span></h2>
+      <p class="subtitle">See how holding dollars vs Bitcoin has performed over any time period</p>
+    </section>
+
+    <!-- Input Card -->
+    <div class="input-card">
+      <h3>⚡ Configure Your Scenario</h3>
+      <div class="input-grid">
+        <div class="input-group">
+          <label>Starting Amount (USD)</label>
+          <input type="number" id="amount" value="10000" min="1" step="100" placeholder="10000">
+        </div>
+        <div class="input-group">
+          <label>Start Year</label>
+          <select id="startYear"></select>
+        </div>
+      </div>
+      <button class="calc-btn" id="calcBtn" onclick="calculate()">Calculate</button>
+    </div>
+
+    <!-- Results -->
+    <div class="results-section" id="results">
+
+      <!-- Comparison Cards -->
+      <div class="comparison-grid">
+
+        <!-- USD Card -->
+        <div class="comparison-card card-usd">
+          <div class="card-title">
+            <span class="card-icon">💵</span>
+            <h3>Holding US Dollars</h3>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Original Amount</span>
+            <span class="stat-value" id="usdOriginal">—</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Purchasing Power Today</span>
+            <span class="stat-value negative" id="usdToday">—</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Purchasing Power Lost</span>
+            <span class="stat-value negative" id="usdLost">—</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Purchasing Power Lost</span>
+            <span class="stat-value negative" id="usdLostPct">—</span>
+          </div>
+          <div class="big-label">Your dollars are worth</div>
+          <div class="big-number negative" id="usdBigNumber">—</div>
+        </div>
+
+        <!-- BTC Card -->
+        <div class="comparison-card card-btc">
+          <div class="card-title">
+            <span class="card-icon">₿</span>
+            <h3>Holding Bitcoin</h3>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Original Amount</span>
+            <span class="stat-value" id="btcOriginal">—</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">BTC Purchased</span>
+            <span class="stat-value accent" id="btcAmount">—</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Value Today</span>
+            <span class="stat-value positive" id="btcToday">—</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Gain</span>
+            <span class="stat-value positive" id="btcGain">—</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Gain</span>
+            <span class="stat-value positive" id="btcGainPct">—</span>
+          </div>
+          <div class="big-label">Your Bitcoin is worth</div>
+          <div class="big-number positive" id="btcBigNumber">—</div>
+        </div>
+      </div>
+
+      <!-- Chart -->
+      <div class="chart-card">
+        <h3>📈 Value Over Time</h3>
+        <div class="chart-container">
+          <canvas id="comparisonChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Verdict -->
+      <div class="verdict-card" id="verdictCard">
+        <div class="verdict-icon">⚖️</div>
+        <h3 id="verdictTitle">—</h3>
+        <p id="verdictText">—</p>
+        <div class="multiplier-badge" id="verdictMultiplier">—</div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      There is no second best. © difficultyadjustment.com
+    </footer>
+  </div>
+
+  <script>
+    // ===== Data =====
+    const BTC_PRICES = {
+      2011: 5, 2012: 13, 2013: 100, 2014: 320, 2015: 250,
+      2016: 430, 2017: 1000, 2018: 3700, 2019: 7200, 2020: 7200,
+      2021: 29000, 2022: 16500, 2023: 16500, 2024: 42000, 2025: 94000
+    };
+
+    const INFLATION_RATES = {
+      2011: 3.2, 2012: 2.1, 2013: 1.5, 2014: 1.6, 2015: 0.1,
+      2016: 1.3, 2017: 2.1, 2018: 2.4, 2019: 1.8, 2020: 1.2,
+      2021: 4.7, 2022: 8.0, 2023: 4.1, 2024: 3.4, 2025: 2.8
+    };
+
+    const CURRENT_YEAR = 2026;
+    let currentBtcPrice = 97000; // fallback
+    let comparisonChart = null;
+
+    // ===== Init =====
+    function init() {
+      const select = document.getElementById('startYear');
+      for (let y = 2011; y <= 2025; y++) {
+        const opt = document.createElement('option');
+        opt.value = y;
+        opt.textContent = y;
+        if (y === 2015) opt.selected = true;
+        select.appendChild(opt);
+      }
+
+      // Fetch live BTC price
+      fetch('/api/prices')
+        .then(r => r.json())
+        .then(data => {
+          if (data && data.bitcoin && data.bitcoin.usd) {
+            currentBtcPrice = data.bitcoin.usd;
+          } else if (data && data.usd) {
+            currentBtcPrice = data.usd;
+          } else if (typeof data === 'number') {
+            currentBtcPrice = data;
+          }
+        })
+        .catch(() => { /* use fallback */ });
+
+      // Auto-calculate on load
+      setTimeout(() => calculate(), 300);
+    }
+
+    // ===== Formatting =====
+    function fmtUSD(n) {
+      if (Math.abs(n) >= 1e9) return '$' + (n / 1e9).toFixed(2) + 'B';
+      if (Math.abs(n) >= 1e6) return '$' + (n / 1e6).toFixed(2) + 'M';
+      return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    }
+
+    function fmtPct(n) {
+      return n.toFixed(1) + '%';
+    }
+
+    function fmtBTC(n) {
+      if (n >= 1) return n.toFixed(4) + ' BTC';
+      if (n >= 0.01) return n.toFixed(6) + ' BTC';
+      return n.toFixed(8) + ' BTC';
+    }
+
+    // ===== Calculation =====
+    function calculate() {
+      const amount = parseFloat(document.getElementById('amount').value) || 10000;
+      const startYear = parseInt(document.getElementById('startYear').value);
+      const years = CURRENT_YEAR - startYear;
+
+      // --- USD Purchasing Power ---
+      let usdPower = amount;
+      const usdTimeline = [{ year: startYear, value: amount }];
+
+      for (let y = startYear; y < CURRENT_YEAR; y++) {
+        const rate = INFLATION_RATES[y] || 3.0;
+        usdPower = usdPower * (1 - rate / 100);
+        usdTimeline.push({ year: y + 1, value: usdPower });
+      }
+
+      const usdLost = amount - usdPower;
+      const usdLostPct = (usdLost / amount) * 100;
+
+      // --- BTC Value ---
+      const btcPriceAtStart = BTC_PRICES[startYear] || 250;
+      const btcBought = amount / btcPriceAtStart;
+      const btcValueNow = btcBought * currentBtcPrice;
+      const btcGain = btcValueNow - amount;
+      const btcGainPct = (btcGain / amount) * 100;
+
+      const btcTimeline = [{ year: startYear, value: amount }];
+      for (let y = startYear + 1; y <= 2025; y++) {
+        const price = BTC_PRICES[y] || BTC_PRICES[2025];
+        btcTimeline.push({ year: y, value: btcBought * price });
+      }
+      // Add current year with live price
+      if (CURRENT_YEAR > 2025) {
+        btcTimeline.push({ year: CURRENT_YEAR, value: btcValueNow });
+      }
+
+      // --- Update DOM ---
+      document.getElementById('usdOriginal').textContent = fmtUSD(amount);
+      document.getElementById('usdToday').textContent = fmtUSD(usdPower);
+      document.getElementById('usdLost').textContent = '-' + fmtUSD(usdLost);
+      document.getElementById('usdLostPct').textContent = '-' + fmtPct(usdLostPct);
+      document.getElementById('usdBigNumber').textContent = fmtUSD(usdPower);
+
+      document.getElementById('btcOriginal').textContent = fmtUSD(amount);
+      document.getElementById('btcAmount').textContent = fmtBTC(btcBought);
+      document.getElementById('btcToday').textContent = fmtUSD(btcValueNow);
+      document.getElementById('btcGain').textContent = '+' + fmtUSD(btcGain);
+      document.getElementById('btcGainPct').textContent = '+' + fmtPct(btcGainPct);
+      document.getElementById('btcBigNumber').textContent = fmtUSD(btcValueNow);
+
+      // --- Verdict ---
+      const multiplier = (btcValueNow / usdPower).toFixed(0);
+      const verdictTitle = document.getElementById('verdictTitle');
+      const verdictText = document.getElementById('verdictText');
+      const verdictMult = document.getElementById('verdictMultiplier');
+
+      verdictTitle.innerHTML = `Since ${startYear}, the US Dollar has lost <span class="loss-highlight">${fmtPct(usdLostPct)}</span> of its purchasing power`;
+      verdictText.innerHTML = `If you held <span class="highlight">${fmtUSD(amount)}</span> in cash since ${startYear}, it would only buy <span class="loss-highlight">${fmtUSD(usdPower)}</span> worth of goods today — a silent theft of <span class="loss-highlight">${fmtUSD(usdLost)}</span>. Meanwhile, that same amount in Bitcoin would be worth <span class="highlight">${fmtUSD(btcValueNow)}</span>. The dollar is a melting ice cube. Bitcoin is the escape hatch.`;
+      verdictMult.textContent = `Bitcoin: ${Number(multiplier).toLocaleString()}x more purchasing power`;
+
+      // --- Chart ---
+      renderChart(usdTimeline, btcTimeline, startYear);
+
+      // Show results
+      const results = document.getElementById('results');
+      results.classList.add('visible');
+      results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    // ===== Chart =====
+    function renderChart(usdData, btcData, startYear) {
+      const ctx = document.getElementById('comparisonChart').getContext('2d');
+
+      if (comparisonChart) {
+        comparisonChart.destroy();
+      }
+
+      const labels = btcData.map(d => d.year.toString());
+      const usdValues = [];
+      const btcValues = btcData.map(d => d.value);
+
+      // Align USD data to same labels
+      for (const label of labels) {
+        const yr = parseInt(label);
+        const point = usdData.find(d => d.year === yr);
+        usdValues.push(point ? point.value : usdData[usdData.length - 1].value);
+      }
+
+      comparisonChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'USD Purchasing Power',
+              data: usdValues,
+              borderColor: '#ef4444',
+              backgroundColor: 'rgba(239, 68, 68, 0.08)',
+              borderWidth: 2.5,
+              pointRadius: 4,
+              pointBackgroundColor: '#ef4444',
+              pointBorderColor: '#ef4444',
+              pointHoverRadius: 6,
+              fill: true,
+              tension: 0.3
+            },
+            {
+              label: 'Bitcoin Value',
+              data: btcValues,
+              borderColor: '#f7931a',
+              backgroundColor: 'rgba(247, 147, 26, 0.08)',
+              borderWidth: 2.5,
+              pointRadius: 4,
+              pointBackgroundColor: '#f7931a',
+              pointBorderColor: '#f7931a',
+              pointHoverRadius: 6,
+              fill: true,
+              tension: 0.3
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: {
+            mode: 'index',
+            intersect: false
+          },
+          plugins: {
+            legend: {
+              labels: {
+                color: '#94a3b8',
+                font: { family: 'Inter', size: 12, weight: '500' },
+                padding: 20,
+                usePointStyle: true,
+                pointStyle: 'circle'
+              }
+            },
+            tooltip: {
+              backgroundColor: '#16161f',
+              titleColor: '#e8e8f0',
+              bodyColor: '#94a3b8',
+              borderColor: '#252530',
+              borderWidth: 1,
+              padding: 14,
+              cornerRadius: 8,
+              titleFont: { family: 'Inter', size: 13, weight: '600' },
+              bodyFont: { family: 'JetBrains Mono', size: 12 },
+              callbacks: {
+                label: function(ctx) {
+                  return ctx.dataset.label + ': ' + fmtUSD(ctx.parsed.y);
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: 'rgba(37, 37, 48, 0.6)', lineWidth: 1 },
+              ticks: {
+                color: '#64748b',
+                font: { family: 'JetBrains Mono', size: 11 }
+              }
+            },
+            y: {
+              type: 'logarithmic',
+              grid: { color: 'rgba(37, 37, 48, 0.6)', lineWidth: 1 },
+              ticks: {
+                color: '#64748b',
+                font: { family: 'JetBrains Mono', size: 11 },
+                callback: function(value) {
+                  if (value >= 1e6) return '$' + (value / 1e6).toFixed(0) + 'M';
+                  if (value >= 1e3) return '$' + (value / 1e3).toFixed(0) + 'K';
+                  return '$' + value;
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // ===== Enter key =====
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') calculate();
+    });
+
+    // ===== Go =====
+    init();
+  </script>
+</body>
+</html>

@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>₿ DCA Calculator — Difficulty Adjustment</title>
+  <meta name="description" content="Bitcoin Dollar-Cost Averaging calculator. See what stacking sats would have returned over any time period.">
+  <meta name="theme-color" content="#f7931a">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>₿</text></svg>">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    .calc-layout { display: grid; grid-template-columns: 380px 1fr; gap: 32px; margin-bottom: 40px; }
+    .calc-inputs { position: sticky; top: 24px; align-self: start; }
+    .input-group { margin-bottom: 20px; }
+    .input-group label { display: block; font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px; font-weight: 600; }
+    .input-group input, .input-group select { width: 100%; background: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-primary); padding: 12px 14px; border-radius: var(--radius-sm); font-size: 14px; font-family: 'JetBrains Mono', monospace; outline: none; }
+    .input-group input:focus, .input-group select:focus { border-color: var(--accent); }
+    .calc-btn { width: 100%; padding: 14px; background: linear-gradient(135deg, #f7931a, #e2711d); border: none; border-radius: var(--radius-sm); color: #000; font-size: 15px; font-weight: 700; cursor: pointer; }
+    .calc-btn:hover { opacity: 0.9; }
+    .results-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+    .result-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; text-align: center; }
+    .result-card.hero { border-color: rgba(247,147,26,0.3); background: linear-gradient(135deg, rgba(247,147,26,0.05), var(--bg-card) 60%); }
+    .result-card .label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+    .result-card .value { font-size: 24px; font-weight: 800; font-family: 'JetBrains Mono', monospace; }
+    .result-card .sub { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
+    .chart-wrap { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; height: 400px; margin-bottom: 24px; }
+    .share-box { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; text-align: center; }
+    .share-text { font-size: 14px; color: var(--text-secondary); margin-bottom: 12px; font-style: italic; }
+    .copy-btn { background: var(--bg-secondary); border: 1px solid var(--border); color: var(--accent); padding: 8px 20px; border-radius: var(--radius-sm); cursor: pointer; font-size: 13px; }
+    .copy-btn:hover { border-color: var(--accent); }
+    .positive { color: #22c55e; }
+    .negative { color: #ef4444; }
+    @media (max-width: 1024px) { .calc-layout { grid-template-columns: 1fr; } .results-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="header-left"><a href="/"><span class="logo">₿</span><h1>Difficulty<span class="accent">Adjustment</span></h1></a></div>
+      <nav class="site-nav">
+        <a href="/" class="nav-link">Dashboard</a>
+        <a href="/history" class="nav-link">History</a>
+        <a href="/learn" class="nav-link">Bitcoin 101</a>
+        <a href="/dca" class="nav-link active">DCA Calc</a>
+        <a href="/calculator" class="nav-link">Mining Calc</a>
+      </nav>
+      <div class="header-right"></div>
+    </header>
+    <div class="page-hero">
+      <h2>DCA <span class="accent">Calculator</span></h2>
+      <p class="subtitle">See what dollar-cost averaging into Bitcoin would have returned over any time period.</p>
+    </div>
+    <div class="calc-layout">
+      <div class="calc-inputs">
+        <div class="card">
+          <div class="card-header"><h3>⚡ Your DCA Plan</h3></div>
+          <div class="input-group">
+            <label>Amount per purchase</label>
+            <input type="number" id="amount" value="100" min="1" step="10">
+          </div>
+          <div class="input-group">
+            <label>Frequency</label>
+            <select id="frequency">
+              <option value="1">Daily</option>
+              <option value="7" selected>Weekly</option>
+              <option value="14">Bi-weekly</option>
+              <option value="30">Monthly</option>
+            </select>
+          </div>
+          <div class="input-group">
+            <label>Start Date</label>
+            <input type="date" id="startDate">
+          </div>
+          <div class="input-group">
+            <label>End Date</label>
+            <input type="date" id="endDate">
+          </div>
+          <button class="calc-btn" onclick="calculate()">📊 Calculate DCA Returns</button>
+        </div>
+      </div>
+      <div class="calc-results">
+        <div class="results-grid">
+          <div class="result-card hero">
+            <div class="label">Current Value</div>
+            <div class="value" id="rValue" style="color:var(--accent)">--</div>
+          </div>
+          <div class="result-card">
+            <div class="label">Total Invested</div>
+            <div class="value" id="rInvested">--</div>
+          </div>
+          <div class="result-card">
+            <div class="label">Profit / Loss</div>
+            <div class="value" id="rProfit">--</div>
+            <div class="sub" id="rProfitPct"></div>
+          </div>
+          <div class="result-card">
+            <div class="label">BTC Accumulated</div>
+            <div class="value" id="rBtc" style="color:var(--accent)">--</div>
+          </div>
+          <div class="result-card">
+            <div class="label">Avg Cost / BTC</div>
+            <div class="value" id="rAvgCost">--</div>
+          </div>
+          <div class="result-card">
+            <div class="label">Total Purchases</div>
+            <div class="value" id="rCount">--</div>
+          </div>
+        </div>
+        <div class="chart-wrap"><canvas id="dcaChart"></canvas></div>
+        <div class="share-box">
+          <div class="share-text" id="shareText">Configure your DCA plan and hit calculate.</div>
+          <button class="copy-btn" onclick="copyShare()">📋 Copy to Clipboard</button>
+        </div>
+      </div>
+    </div>
+    <footer class="footer"><span>₿ difficultyadjustment.com • Stack sats. Stay humble. • Data: CoinGecko, Yahoo Finance</span></footer>
+  </div>
+  <script>
+    var priceData = null;
+    var dcaChart = null;
+
+    // Set default dates
+    var now = new Date();
+    var threeYearsAgo = new Date(now.getFullYear() - 3, now.getMonth(), now.getDate());
+    document.getElementById('startDate').value = threeYearsAgo.toISOString().split('T')[0];
+    document.getElementById('endDate').value = now.toISOString().split('T')[0];
+
+    async function loadPrices() {
+      try {
+        var res = await fetch('/api/chart-long/max');
+        var data = await res.json();
+        if (data.prices) priceData = data.prices; // [[timestamp_ms, price], ...]
+      } catch(e) { console.error('Failed to load prices'); }
+    }
+
+    function getPriceAtDate(targetMs) {
+      if (!priceData || !priceData.length) return null;
+      var closest = priceData[0];
+      var minDiff = Math.abs(priceData[0][0] - targetMs);
+      for (var i = 1; i < priceData.length; i++) {
+        var diff = Math.abs(priceData[i][0] - targetMs);
+        if (diff < minDiff) { minDiff = diff; closest = priceData[i]; }
+      }
+      return closest[1];
+    }
+
+    function calculate() {
+      if (!priceData) { alert('Price data still loading...'); return; }
+      var amount = parseFloat(document.getElementById('amount').value) || 100;
+      var freqDays = parseInt(document.getElementById('frequency').value) || 7;
+      var startStr = document.getElementById('startDate').value;
+      var endStr = document.getElementById('endDate').value;
+      if (!startStr || !endStr) return;
+
+      var start = new Date(startStr + 'T00:00:00');
+      var end = new Date(endStr + 'T00:00:00');
+      var totalBtc = 0, totalInvested = 0, purchases = 0;
+      var chartLabels = [], chartPortfolio = [], chartInvested = [];
+
+      var current = new Date(start);
+      while (current <= end) {
+        var price = getPriceAtDate(current.getTime());
+        if (price && price > 0) {
+          var btcBought = amount / price;
+          totalBtc += btcBought;
+          totalInvested += amount;
+          purchases++;
+          chartLabels.push(new Date(current));
+          chartPortfolio.push(totalBtc * price);
+          chartInvested.push(totalInvested);
+        }
+        current.setDate(current.getDate() + freqDays);
+      }
+
+      // Current value using latest price
+      var currentPrice = priceData[priceData.length - 1][1];
+      var currentValue = totalBtc * currentPrice;
+      var profit = currentValue - totalInvested;
+      var profitPct = totalInvested > 0 ? (profit / totalInvested * 100) : 0;
+      var avgCost = totalBtc > 0 ? totalInvested / totalBtc : 0;
+
+      // Update last chart point to current value
+      if (chartPortfolio.length) chartPortfolio[chartPortfolio.length - 1] = currentValue;
+
+      document.getElementById('rValue').textContent = '$' + Math.round(currentValue).toLocaleString();
+      document.getElementById('rInvested').textContent = '$' + Math.round(totalInvested).toLocaleString();
+      var profitEl = document.getElementById('rProfit');
+      profitEl.textContent = (profit >= 0 ? '+$' : '-$') + Math.abs(Math.round(profit)).toLocaleString();
+      profitEl.className = 'value ' + (profit >= 0 ? 'positive' : 'negative');
+      document.getElementById('rProfitPct').textContent = (profitPct >= 0 ? '+' : '') + profitPct.toFixed(1) + '%';
+      document.getElementById('rBtc').textContent = totalBtc.toFixed(8) + ' BTC';
+      document.getElementById('rAvgCost').textContent = '$' + Math.round(avgCost).toLocaleString();
+      document.getElementById('rCount').textContent = purchases;
+
+      // Share text
+      var freqName = {1:'daily',7:'weekly',14:'bi-weekly',30:'monthly'}[freqDays] || 'periodic';
+      document.getElementById('shareText').textContent =
+        'If I had invested $' + amount + ' ' + freqName + ' into Bitcoin from ' + startStr + ' to ' + endStr +
+        ', I would have invested $' + totalInvested.toLocaleString() + ' and it would be worth $' +
+        Math.round(currentValue).toLocaleString() + ' today (' + (profitPct >= 0 ? '+' : '') + profitPct.toFixed(1) + '%). ' +
+        totalBtc.toFixed(4) + ' BTC accumulated. difficultyadjustment.com/dca';
+
+      // Chart
+      renderChart(chartLabels, chartPortfolio, chartInvested);
+    }
+
+    function renderChart(labels, portfolio, invested) {
+      var ctx = document.getElementById('dcaChart').getContext('2d');
+      if (dcaChart) dcaChart.destroy();
+      dcaChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Portfolio Value',
+              data: portfolio,
+              borderColor: '#f7931a',
+              borderWidth: 2,
+              backgroundColor: 'rgba(247,147,26,0.1)',
+              fill: true,
+              tension: 0.3,
+              pointRadius: 0,
+            },
+            {
+              label: 'Total Invested',
+              data: invested,
+              borderColor: '#64748b',
+              borderWidth: 2,
+              borderDash: [6, 4],
+              backgroundColor: 'transparent',
+              tension: 0,
+              pointRadius: 0,
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          scales: {
+            x: { type: 'time', grid: { display: false }, ticks: { maxTicksLimit: 8, font: { size: 11 } } },
+            y: { grid: { color: '#25253020' }, ticks: { callback: function(v) { return '$' + (v >= 1000 ? (v/1000).toFixed(0) + 'K' : v); }, font: { size: 11, family: "'JetBrains Mono', monospace" } } }
+          },
+          plugins: {
+            legend: { display: true, labels: { color: '#94a3b8', font: { size: 12 } } },
+            tooltip: { backgroundColor: '#16161f', borderColor: '#252530', borderWidth: 1, callbacks: { label: function(ctx) { return ctx.dataset.label + ': $' + Math.round(ctx.parsed.y).toLocaleString(); } } }
+          }
+        }
+      });
+    }
+
+    function copyShare() {
+      var text = document.getElementById('shareText').textContent;
+      navigator.clipboard.writeText(text).then(function() {
+        var btn = document.querySelector('.copy-btn');
+        btn.textContent = '✅ Copied!';
+        setTimeout(function() { btn.textContent = '📋 Copy to Clipboard'; }, 2000);
+      });
+    }
+
+    loadPrices();
+  </script>
+</body>
+</html>

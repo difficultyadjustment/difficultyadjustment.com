@@ -5,12 +5,37 @@ let btcChart = null;
 let fngChart = null;
 let btcPriceGlobal = 0;
 
+// Currency state
+var currentCurrency = localStorage.getItem('btcintel_currency') || 'usd';
+var currencySymbols = {
+  usd: '$', cad: 'CA$', eur: '€', gbp: '£', aud: 'A$', jpy: '¥',
+  chf: 'CHF ', cny: '¥', inr: '₹', brl: 'R$', mxn: 'MX$', sek: 'kr ',
+  nok: 'kr ', nzd: 'NZ$', sgd: 'S$', hkd: 'HK$', krw: '₩', zar: 'R',
+  sats: '', btc: '₿'
+};
+var exchangeRate = 1; // vs USD rate for macro conversion
+
+function csym() { return currencySymbols[currentCurrency] || '$'; }
+
 // Formatters
 const fmt = {
   price(n) {
-    if (n >= 1000) return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-    if (n >= 1) return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    return '$' + n.toFixed(6);
+    if (currentCurrency === 'sats') {
+      return Math.round(n).toLocaleString() + ' sats';
+    }
+    var s = csym();
+    if (n >= 1000) return s + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    if (n >= 1) return s + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    if (n >= 0.01) return s + n.toFixed(4);
+    return s + n.toFixed(6);
+  },
+  // Format macro values (always USD, convert with exchangeRate)
+  usdToLocal(n) {
+    if (currentCurrency === 'usd') return '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
+    var converted = n * exchangeRate;
+    var s = csym();
+    if (converted >= 1000) return s + converted.toLocaleString('en-US', { maximumFractionDigits: 0 });
+    return s + converted.toFixed(2);
   },
   sats(usdPrice) {
     if (!btcPriceGlobal || !usdPrice) return '--';
@@ -22,13 +47,17 @@ const fmt = {
     return (n >= 0 ? '+' : '') + n.toFixed(1) + '%';
   },
   mcap(n) {
-    if (n >= 1e12) return '$' + (n / 1e12).toFixed(2) + 'T';
-    if (n >= 1e9) return '$' + (n / 1e9).toFixed(1) + 'B';
-    return '$' + (n / 1e6).toFixed(0) + 'M';
+    var s = csym();
+    if (currentCurrency === 'sats') { s = ''; n = n; } // sats mcap doesn't make sense, keep as-is with $
+    if (currentCurrency === 'sats') s = '$';
+    if (n >= 1e12) return s + (n / 1e12).toFixed(2) + 'T';
+    if (n >= 1e9) return s + (n / 1e9).toFixed(1) + 'B';
+    return s + (n / 1e6).toFixed(0) + 'M';
   },
   vol(n) {
-    if (n >= 1e9) return '$' + (n / 1e9).toFixed(1) + 'B';
-    return '$' + (n / 1e6).toFixed(0) + 'M';
+    var s = (currentCurrency === 'sats') ? '$' : csym();
+    if (n >= 1e9) return s + (n / 1e9).toFixed(1) + 'B';
+    return s + (n / 1e6).toFixed(0) + 'M';
   },
   supply(n) {
     return (n / 1e6).toFixed(2) + 'M';
@@ -54,7 +83,7 @@ function createGradient(ctx, color, height) {
 // ===== FETCH FUNCTIONS =====
 
 async function fetchPrices() {
-  const res = await fetch('/api/prices');
+  const res = await fetch('/api/prices?vs=' + currentCurrency);
   const data = await res.json();
   if (Array.isArray(data)) {
     const btc = data.find(c => c.id === 'bitcoin');
@@ -144,21 +173,25 @@ async function fetchXPosts() {
   if (Array.isArray(data) && data.length) renderXPosts(data);
 }
 
+var lastChartRange = { type: 'short', value: 1 };
+
 async function loadChart(coin, days, btn) {
   if (btn) {
-    document.querySelectorAll('.chart-tabs .tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.btc-hero .chart-tabs .tab').forEach(function(t) { t.classList.remove('active'); });
     btn.classList.add('active');
   }
-  const res = await fetch('/api/chart/' + coin + '/' + days);
-  const data = await res.json();
+  lastChartRange = { type: 'short', value: days };
+  var res = await fetch('/api/chart/' + coin + '/' + days + '?vs=' + currentCurrency);
+  var data = await res.json();
   if (data.prices) renderBTCChart(data.prices, days);
 }
 
 async function loadChartLong(range, btn) {
   if (btn) {
-    document.querySelectorAll('.chart-tabs .tab').forEach(function(t) { t.classList.remove('active'); });
+    document.querySelectorAll('.btc-hero .chart-tabs .tab').forEach(function(t) { t.classList.remove('active'); });
     btn.classList.add('active');
   }
+  lastChartRange = { type: 'long', value: range };
   var res = await fetch('/api/chart-long/' + range);
   var data = await res.json();
   if (data.prices) renderBTCChart(data.prices, range);
@@ -174,10 +207,12 @@ function renderBTCHero(btc) {
   // Dynamic page title with price
   document.title = fmt.price(btc.current_price) + ' — Bitcoin Intelligence Dashboard';
 
-  // Sats per dollar
-  const satsPerDollar = Math.round(100000000 / btc.current_price);
-  const satsEl = document.getElementById('satsPerDollar');
-  if (satsEl) satsEl.textContent = satsPerDollar.toLocaleString();
+  // Sats per unit of currency
+  var satsPerUnit = Math.round(100000000 / btc.current_price);
+  var satsEl = document.getElementById('satsPerDollar');
+  if (satsEl) satsEl.textContent = satsPerUnit.toLocaleString();
+  var satsLabel = document.getElementById('satsLabel');
+  if (satsLabel) satsLabel.textContent = 'Sats / ' + currentCurrency.toUpperCase();
 
   // Days since ATH
   var daysSinceATH = '--';
@@ -275,7 +310,7 @@ function renderBTCChart(prices, days) {
         y: {
           grid: { color: '#25253020' },
           ticks: {
-            callback: v => '$' + (v >= 1000 ? (v / 1000).toFixed(0) + 'K' : v),
+            callback: function(v) { return csym() + (v >= 1000 ? (v / 1000).toFixed(0) + 'K' : v); },
             font: { size: 11, family: "'JetBrains Mono', monospace" }
           }
         }
@@ -1151,6 +1186,44 @@ document.addEventListener('click', function(e) {
 // Apply saved visibility on load
 applySectionVisibility();
 
+// ===== CURRENCY =====
+
+async function changeCurrency(currency) {
+  currentCurrency = currency;
+  localStorage.setItem('btcintel_currency', currency);
+
+  // Fetch exchange rate for macro conversion
+  if (currency !== 'usd') {
+    try {
+      var res = await fetch('/api/exchange-rate?vs=' + currency);
+      var data = await res.json();
+      exchangeRate = data.rate || 1;
+    } catch (e) { exchangeRate = 1; }
+  } else {
+    exchangeRate = 1;
+  }
+
+  // Reload all data with new currency
+  refreshAll();
+}
+
+// Restore saved currency on load
+(function() {
+  var saved = localStorage.getItem('btcintel_currency');
+  if (saved) {
+    currentCurrency = saved;
+    var sel = document.getElementById('currencySelect');
+    if (sel) sel.value = saved;
+    // Fetch exchange rate
+    if (saved !== 'usd') {
+      fetch('/api/exchange-rate?vs=' + saved)
+        .then(function(r) { return r.json(); })
+        .then(function(d) { exchangeRate = d.rate || 1; })
+        .catch(function() {});
+    }
+  }
+})();
+
 // ===== INIT =====
 
 function updateTimestamp() {
@@ -1164,7 +1237,10 @@ async function refreshAll() {
     fetchPrices().catch(e => console.error('prices failed:', e)),
     fetchFearGreed().catch(e => console.error('fng failed:', e)),
     fetchGlobal().catch(e => console.error('global failed:', e)),
-    loadChart('bitcoin', 1).catch(e => console.error('chart failed:', e)),
+    (lastChartRange.type === 'long'
+      ? loadChartLong(lastChartRange.value).catch(function(e) { console.error('chart failed:', e); })
+      : loadChart('bitcoin', lastChartRange.value).catch(function(e) { console.error('chart failed:', e); })
+    ),
     fetchNews().catch(e => console.error('news failed:', e)),
     fetchMining().catch(e => console.error('mining failed:', e)),
     fetchMacro().catch(e => console.error('macro failed:', e)),

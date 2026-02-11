@@ -111,23 +111,46 @@ function cached(key, ttlMs, fetchFn) {
   };
 }
 
-// Prices — cache 60s
-app.get('/api/prices', cached('prices', 60000, async () => {
-  const url = 'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=bitcoin,ethereum,solana,cardano,avalanche-2,chainlink,polkadot,dogecoin&order=market_cap_desc&sparkline=true&price_change_percentage=1h,24h,7d,30d';
-  const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
-  if (!resp.ok) throw new Error('CoinGecko ' + resp.status);
-  return resp.json();
-}));
-
-// Chart — cache 120s per coin/days combo
-app.get('/api/chart/:coin/:days', async (req, res) => {
-  const { coin, days } = req.params;
-  const key = `chart-${coin}-${days}`;
-  const handler = cached(key, 120000, async () => {
-    const url = `https://api.coingecko.com/api/v3/coins/${encodeURIComponent(coin)}/market_chart?vs_currency=usd&days=${encodeURIComponent(days)}`;
+// Prices — cache 60s (with currency support)
+app.get('/api/prices', async (req, res) => {
+  const vs = (req.query.vs || 'usd').toLowerCase();
+  const key = 'prices-' + vs;
+  const handler = cached(key, 60000, async () => {
+    const url = 'https://api.coingecko.com/api/v3/coins/markets?vs_currency=' + encodeURIComponent(vs) + '&ids=bitcoin,ethereum,solana,cardano,avalanche-2,chainlink,polkadot,dogecoin&order=market_cap_desc&sparkline=true&price_change_percentage=1h,24h,7d,30d';
     const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
     if (!resp.ok) throw new Error('CoinGecko ' + resp.status);
     return resp.json();
+  });
+  return handler(req, res);
+});
+
+// Chart — cache 120s per coin/days/currency combo
+app.get('/api/chart/:coin/:days', async (req, res) => {
+  const { coin, days } = req.params;
+  const vs = (req.query.vs || 'usd').toLowerCase();
+  const key = `chart-${coin}-${days}-${vs}`;
+  const handler = cached(key, 120000, async () => {
+    const url = `https://api.coingecko.com/api/v3/coins/${encodeURIComponent(coin)}/market_chart?vs_currency=${encodeURIComponent(vs)}&days=${encodeURIComponent(days)}`;
+    const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    if (!resp.ok) throw new Error('CoinGecko ' + resp.status);
+    return resp.json();
+  });
+  return handler(req, res);
+});
+
+// Exchange rates for currency conversion (cache 600s)
+app.get('/api/exchange-rate', async (req, res) => {
+  const vs = (req.query.vs || 'usd').toLowerCase();
+  if (vs === 'usd') return res.json({ rate: 1, currency: 'usd' });
+  const key = 'exrate-' + vs;
+  const handler = cached(key, 600000, async () => {
+    const url = 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd,' + encodeURIComponent(vs);
+    const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    if (!resp.ok) throw new Error('CoinGecko rate ' + resp.status);
+    const data = await resp.json();
+    const usdPrice = data.bitcoin?.usd || 1;
+    const vsPrice = data.bitcoin?.[vs] || 1;
+    return { rate: vsPrice / usdPrice, currency: vs };
   });
   return handler(req, res);
 });

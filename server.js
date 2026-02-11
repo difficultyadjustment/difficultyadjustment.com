@@ -191,7 +191,9 @@ app.get('/api/macro', async (req, res) => {
   const tickers = [
     { sym: 'DX-Y.NYB', key: 'dxy', name: 'Dollar Index (DXY)' },
     { sym: 'GC=F', key: 'gold', name: 'Gold' },
+    { sym: 'SI=F', key: 'silver', name: 'Silver' },
     { sym: '^GSPC', key: 'spx', name: 'S&P 500' },
+    { sym: '^DJI', key: 'djia', name: 'Dow Jones' },
     { sym: '^TNX', key: 'yield10y', name: '10Y Treasury' },
     { sym: '^VIX', key: 'vix', name: 'VIX' },
     { sym: 'CL=F', key: 'oil', name: 'Crude Oil (WTI)' },
@@ -215,16 +217,17 @@ app.get('/api/macro', async (req, res) => {
       if (!r) return;
       const meta = r.meta || {};
       const closes = (r.indicators?.quote?.[0]?.close || []).filter(c => c != null);
-      const timestamps = (r.timestamp || []);
-      const prev = meta.previousClose || (closes.length > 1 ? closes[closes.length - 2] : null);
       const price = meta.regularMarketPrice;
-      const changePct = prev ? ((price - prev) / prev * 100) : null;
+      
+      // Calculate change over the FULL range (first close → current price)
+      const firstClose = closes.length > 0 ? closes[0] : null;
+      const rangePct = firstClose ? ((price - firstClose) / firstClose * 100) : null;
 
       results[t.key] = {
         name: t.name,
         price,
-        prevClose: prev,
-        changePct,
+        firstPrice: firstClose,
+        changePct: rangePct,
         sparkline: closes,
       };
     } catch (e) { /* skip failed ticker */ }

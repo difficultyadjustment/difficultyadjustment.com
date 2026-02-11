@@ -999,11 +999,24 @@ function renderMacro(data) {
     renderBtcGoldChart(g.sparkline);
   }
 
+  // Silver
+  if (data.silver) {
+    var sv = data.silver;
+    tiles.push({ key: 'silver', name: 'Silver', value: '$' + sv.price.toFixed(2), change: sv.changePct, spark: sv.sparkline, cls: 'neutral-btc', context: 'Precious metals bellwether' });
+  }
+
   // SPX
   if (data.spx) {
     var s = data.spx;
     var spxSent = s.changePct > 0 ? 'neutral-btc' : 'bearish-btc';
     tiles.push({ key: 'spx', name: 'S&P 500', value: s.price.toLocaleString(undefined, {maximumFractionDigits:0}), change: s.changePct, spark: s.sparkline, cls: spxSent, context: 'Risk appetite gauge' });
+  }
+
+  // DJIA
+  if (data.djia) {
+    var dj = data.djia;
+    var djSent = dj.changePct > 0 ? 'neutral-btc' : 'bearish-btc';
+    tiles.push({ key: 'djia', name: 'Dow Jones', value: dj.price.toLocaleString(undefined, {maximumFractionDigits:0}), change: dj.changePct, spark: dj.sparkline, cls: djSent, context: 'Traditional market health' });
   }
 
   // 10Y

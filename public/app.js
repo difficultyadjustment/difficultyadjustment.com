@@ -1,10 +1,12 @@
 // Bitcoin Intelligence Dashboard
 // There is no second best.
 
-// PWA: register service worker
+// PWA: register service worker (force update on deploy)
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function() {
-    navigator.serviceWorker.register('/sw.js').catch(function() { /* ignore */ });
+    navigator.serviceWorker.register('/sw.js').then(function(reg) {
+      try { reg.update(); } catch (e) {}
+    }).catch(function() { /* ignore */ });
   });
 }
 
@@ -105,11 +107,42 @@ document.addEventListener('click', closeAllNavDropdowns);
 // iOS Safari can be picky about click delay; also listen for touchstart
 document.addEventListener('touchstart', closeAllNavDropdowns, { passive: true });
 
+function setPwaStatus(mode) {
+  var bar = document.getElementById('pwaStatus');
+  if (!bar) return;
+  var text = document.getElementById('pwaStatusText');
+  var tag = document.getElementById('pwaStatusTag');
+  bar.classList.add('show');
+  tag.className = 'tag';
+
+  if (mode === 'offline') {
+    if (text) text.textContent = 'offline';
+    if (tag) { tag.textContent = 'OFFLINE'; tag.classList.add('offline'); }
+    return;
+  }
+
+  if (mode === 'cached') {
+    if (text) text.textContent = 'online (cached data)';
+    if (tag) { tag.textContent = 'CACHED'; tag.classList.add('cached'); }
+    return;
+  }
+
+  // online
+  if (text) text.textContent = 'online';
+  if (tag) tag.textContent = '';
+  // hide after a moment to reduce clutter
+  setTimeout(function() { bar.classList.remove('show'); }, 1200);
+}
+
+window.addEventListener('online', function() { setPwaStatus('online'); });
+window.addEventListener('offline', function() { setPwaStatus('offline'); });
+
 // ===== FETCH FUNCTIONS =====
 
 async function fetchPrices() {
   const res = await fetch('/api/prices?vs=' + currentCurrency);
   const data = await res.json();
+  if (res && res.headers && res.headers.get('X-Cache') === 'HIT') setPwaStatus('cached');
   if (Array.isArray(data)) {
     const btc = data.find(c => c.id === 'bitcoin');
     if (btc) {

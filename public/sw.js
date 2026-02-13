@@ -1,6 +1,6 @@
 /* Difficulty Adjustment PWA Service Worker */
 
-const VERSION = 'pwa-v1';
+const VERSION = 'pwa-v2';
 
 // App shell (keep small; avoid caching huge HTML blobs that change often)
 const SHELL = [
@@ -64,10 +64,21 @@ self.addEventListener('fetch', (event) => {
         return resp;
       }).catch(() => null);
 
+      // Helper: mark cached responses so UI can display "cached" status
+      function markCachedResponse(r) {
+        try {
+          const h = new Headers(r.headers);
+          h.set('X-Cache', 'HIT');
+          return new Response(r.body, { status: r.status, statusText: r.statusText, headers: h });
+        } catch (e) {
+          return r;
+        }
+      }
+
       // If we have cached, return it immediately; update in background.
       if (cached) {
         event.waitUntil(fetchPromise);
-        return cached;
+        return markCachedResponse(cached);
       }
 
       // Otherwise, go network first; if it fails, show a minimal fallback.

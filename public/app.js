@@ -1,6 +1,13 @@
 // Bitcoin Intelligence Dashboard
 // There is no second best.
 
+// PWA: register service worker
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('/sw.js').catch(function() { /* ignore */ });
+  });
+}
+
 let btcChart = null;
 let fngChart = null;
 let btcPriceGlobal = 0;

@@ -181,39 +181,53 @@ function cached(key, ttlMs, fetchFn) {
 
 // Prices — cache 60s (with currency support)
 // Strategy:
-// - USD pricing for coins comes from Binance (more reliable, avoids CoinGecko 429 loops).
+// - USD pricing for coins comes from Coinbase (more reliable across hosts; Binance can return 451 in some regions).
 // - Fiat conversion uses our existing CoinGecko exchange-rate endpoint (cached heavily).
 // - Market cap / sparkline fields still come from CoinGecko as "nice to have"; if CG 429s we still return prices.
 app.get('/api/prices', async (req, res) => {
   const vs = (req.query.vs || 'usd').toLowerCase();
   const key = 'prices-' + vs;
 
-  const handler = cached(key, 60000, async (req) => {
+  const handler = cached(key, 60000, async () => {
     const ids = ['bitcoin','ethereum','solana','cardano','avalanche-2','chainlink','polkadot','dogecoin'];
-    const binance = {
-      bitcoin: 'BTCUSDT',
-      ethereum: 'ETHUSDT',
-      solana: 'SOLUSDT',
-      cardano: 'ADAUSDT',
-      'avalanche-2': 'AVAXUSDT',
-      chainlink: 'LINKUSDT',
-      polkadot: 'DOTUSDT',
-      dogecoin: 'DOGEUSDT'
+
+    const coinbase = {
+      bitcoin: 'BTC-USD',
+      ethereum: 'ETH-USD',
+      solana: 'SOL-USD',
+      cardano: 'ADA-USD',
+      'avalanche-2': 'AVAX-USD',
+      chainlink: 'LINK-USD',
+      polkadot: 'DOT-USD',
+      dogecoin: 'DOGE-USD'
     };
 
-    // 1) Get USD prices (24h change too) from Binance
-    const binanceSymbols = ids.map(id => binance[id]).filter(Boolean);
-    const tickerUrl = 'https://api.binance.com/api/v3/ticker/24hr?symbols=' + encodeURIComponent(JSON.stringify(binanceSymbols));
-    const tResp = await fetch(tickerUrl, { signal: AbortSignal.timeout(10000) });
-    if (!tResp.ok) throw new Error('Binance ' + tResp.status);
-    const tickers = await tResp.json();
-    const bySymbol = {};
-    tickers.forEach(t => { bySymbol[t.symbol] = t; });
+    async function cbJson(path) {
+      const url = 'https://api.exchange.coinbase.com' + path;
+      const resp = await fetch(url, {
+        headers: { 'User-Agent': 'Mozilla/5.0' },
+        signal: AbortSignal.timeout(10000)
+      });
+      if (!resp.ok) throw new Error('Coinbase ' + resp.status);
+      return resp.json();
+    }
+
+    // 1) Get USD last + 24h open via /stats for each product (parallel)
+    const stats = {};
+    await Promise.allSettled(ids.map(async (id) => {
+      const product = coinbase[id];
+      if (!product) return;
+      const s = await cbJson('/products/' + encodeURIComponent(product) + '/stats');
+      // { open, high, low, last, volume, volume_30day }
+      const last = parseFloat(s.last);
+      const open = parseFloat(s.open);
+      const pct24h = (isFinite(last) && isFinite(open) && open !== 0) ? ((last - open) / open * 100) : null;
+      stats[id] = { last, pct24h };
+    }));
 
     // 2) Get conversion rate from USD -> vs (cached endpoint). For USD, rate=1.
     let usdToVs = 1;
     if (vs !== 'usd') {
-      // reuse our own endpoint to keep all logic in one place
       const exUrl = 'http://127.0.0.1:' + PORT + '/api/exchange-rate?vs=' + encodeURIComponent(vs);
       const exResp = await fetch(exUrl, { signal: AbortSignal.timeout(10000) });
       if (exResp.ok) {
@@ -222,7 +236,7 @@ app.get('/api/prices', async (req, res) => {
       }
     }
 
-    // 3) Optional CoinGecko enrichment: market cap + sparkline + % changes in target currency
+    // 3) Optional CoinGecko enrichment
     let cgMap = {};
     try {
       const cgUrl = 'https://api.coingecko.com/api/v3/coins/markets?vs_currency=' + encodeURIComponent(vs) + '&ids=' + ids.join(',') + '&order=market_cap_desc&sparkline=true&price_change_percentage=1h,24h,7d,30d';
@@ -233,16 +247,13 @@ app.get('/api/prices', async (req, res) => {
       }
     } catch (e) { /* ignore CG failures */ }
 
-    // 4) Build response in the same shape the frontend expects
+    // 4) Build response
     const out = ids.map((id) => {
-      const sym = binance[id];
-      const t = bySymbol[sym];
-      const usd = t ? parseFloat(t.lastPrice) : null;
+      const s = stats[id] || {};
+      const usd = isFinite(s.last) ? s.last : null;
       const curPrice = (usd != null) ? (usd * usdToVs) : null;
-
       const cg = cgMap[id] || {};
 
-      // If CG didn’t load, we still provide key fields so UI can render.
       return {
         id,
         symbol: (cg.symbol || (id === 'avalanche-2' ? 'avax' : id.slice(0, 3))).toLowerCase(),
@@ -253,13 +264,14 @@ app.get('/api/prices', async (req, res) => {
         total_volume: cg.total_volume || null,
         sparkline_in_7d: cg.sparkline_in_7d || null,
         price_change_percentage_1h_in_currency: cg.price_change_percentage_1h_in_currency ?? null,
-        price_change_percentage_24h_in_currency: (cg.price_change_percentage_24h_in_currency ?? (t ? parseFloat(t.priceChangePercent) : null)),
+        price_change_percentage_24h_in_currency: (cg.price_change_percentage_24h_in_currency ?? (isFinite(s.pct24h) ? s.pct24h : null)),
         price_change_percentage_7d_in_currency: cg.price_change_percentage_7d_in_currency ?? null,
         price_change_percentage_30d_in_currency: cg.price_change_percentage_30d_in_currency ?? null,
         ath_date: cg.ath_date || null,
       };
     }).filter(x => x.current_price != null);
 
+    if (!out.length) throw new Error('No price data');
     return out;
   });
 
@@ -267,7 +279,7 @@ app.get('/api/prices', async (req, res) => {
 });
 
 // Chart — cache 120s per coin/days/currency combo
-// Primary for BTC: Binance klines (more reliable than CoinGecko). Fallback to CoinGecko for others.
+// Primary for BTC: Coinbase candles (Binance can return 451 in some regions). Fallback to CoinGecko for others.
 app.get('/api/chart/:coin/:days', async (req, res) => {
   const { coin, days } = req.params;
   const vs = (req.query.vs || 'usd').toLowerCase();
@@ -277,34 +289,48 @@ app.get('/api/chart/:coin/:days', async (req, res) => {
     const d = parseInt(days, 10);
     const isBtc = String(coin).toLowerCase() === 'bitcoin';
 
-    // BTC short-range chart: Binance only supports USDT pairs. We return USD-ish and let client format currency.
     if (isBtc && Number.isFinite(d) && d > 0 && d <= 365) {
-      // Interval selection
-      let interval = '1h';
-      if (d <= 2) interval = '15m';
-      else if (d <= 7) interval = '1h';
-      else if (d <= 90) interval = '4h';
-      else interval = '1d';
+      // Coinbase granularity (seconds): 60, 300, 900, 3600, 21600, 86400
+      let gran = 3600;
+      if (d <= 2) gran = 900;
+      else if (d <= 7) gran = 3600;
+      else if (d <= 90) gran = 21600;
+      else gran = 86400;
 
-      // Binance limit max 1000; we’ll estimate.
-      const points = (function() {
-        if (interval === '15m') return Math.min(1000, d * 96);
-        if (interval === '1h') return Math.min(1000, d * 24);
-        if (interval === '4h') return Math.min(1000, d * 6);
-        return Math.min(1000, d);
-      })();
+      // Coinbase max 300 candles per request; chunk with time windows.
+      const end = Math.floor(Date.now() / 1000);
+      const start = end - d * 86400;
 
-      const url = 'https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=' + interval + '&limit=' + points;
-      const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
-      if (!resp.ok) throw new Error('Binance ' + resp.status);
-      const klines = await resp.json();
+      async function fetchChunk(s, e) {
+        const url = 'https://api.exchange.coinbase.com/products/BTC-USD/candles?granularity=' + gran + '&start=' + new Date(s * 1000).toISOString() + '&end=' + new Date(e * 1000).toISOString();
+        const resp = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(10000) });
+        if (!resp.ok) throw new Error('Coinbase ' + resp.status);
+        return resp.json();
+      }
 
-      // Convert to CoinGecko-like shape: { prices: [[ms, price], ...] }
-      const prices = (klines || []).map(k => [k[0], parseFloat(k[4])]).filter(p => isFinite(p[0]) && isFinite(p[1]));
-      return { prices, source: 'binance', vs: 'usd' };
+      const maxSpan = gran * 300; // seconds per chunk
+      const chunks = [];
+      for (let s = start; s < end; s += maxSpan) {
+        const e = Math.min(end, s + maxSpan);
+        chunks.push([s, e]);
+      }
+
+      const results = await Promise.allSettled(chunks.map(([s, e]) => fetchChunk(s, e)));
+      const candles = [];
+      results.forEach(r => {
+        if (r.status === 'fulfilled' && Array.isArray(r.value)) candles.push(...r.value);
+      });
+
+      // Coinbase candle format: [ time, low, high, open, close, volume ]
+      const prices = candles
+        .map(c => [c[0] * 1000, parseFloat(c[4])])
+        .filter(p => isFinite(p[0]) && isFinite(p[1]))
+        .sort((a, b) => a[0] - b[0]);
+
+      if (prices.length) return { prices, source: 'coinbase', vs: 'usd' };
     }
 
-    // Fallback: CoinGecko market_chart (alts, or if BTC params are weird)
+    // Fallback: CoinGecko market_chart
     const url = `https://api.coingecko.com/api/v3/coins/${encodeURIComponent(coin)}/market_chart?vs_currency=${encodeURIComponent(vs)}&days=${encodeURIComponent(days)}`;
     const resp = await coingeckoFetch(url, { signal: AbortSignal.timeout(10000) });
     if (!resp.ok) throw new Error('CoinGecko ' + resp.status);

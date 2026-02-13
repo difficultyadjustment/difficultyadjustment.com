@@ -40,6 +40,13 @@ function isSameOrigin(url) {
   return url.origin === self.location.origin;
 }
 
+self.addEventListener('message', (event) => {
+  const data = event.data || {};
+  if (data.type === 'CLEAR_API_CACHE') {
+    event.waitUntil(caches.delete(API_CACHE));
+  }
+});
+
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   const url = new URL(req.url);

@@ -137,10 +137,33 @@ function setPwaStatus(mode) {
 window.addEventListener('online', function() { setPwaStatus('online'); });
 window.addEventListener('offline', function() { setPwaStatus('offline'); });
 
+// Hard refresh: bypass service worker cache for key API calls
+var hardRefreshNonce = 0;
+function apiUrl(path) {
+  if (!hardRefreshNonce) return path;
+  const sep = path.indexOf('?') >= 0 ? '&' : '?';
+  return path + sep + '__hr=' + hardRefreshNonce;
+}
+
+async function hardRefreshData() {
+  hardRefreshNonce = Date.now();
+  setPwaStatus('online');
+
+  // Try to clear SW caches too (best-effort)
+  try {
+    if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_API_CACHE' });
+    }
+  } catch (e) {}
+
+  // Force reload all visible data
+  refreshAll();
+}
+
 // ===== FETCH FUNCTIONS =====
 
 async function fetchPrices() {
-  const res = await fetch('/api/prices?vs=' + currentCurrency);
+  const res = await fetch(apiUrl('/api/prices?vs=' + currentCurrency));
   const data = await res.json();
   if (res && res.headers && res.headers.get('X-Cache') === 'HIT') setPwaStatus('cached');
   if (Array.isArray(data)) {
@@ -157,31 +180,31 @@ async function fetchPrices() {
 }
 
 async function fetchFearGreed() {
-  const res = await fetch('/api/fear-greed');
+  const res = await fetch(apiUrl('/api/fear-greed'));
   const data = await res.json();
   if (data.data) renderFearGreed(data.data);
 }
 
 async function fetchGlobal() {
-  const res = await fetch('/api/global');
+  const res = await fetch(apiUrl('/api/global'));
   const json = await res.json();
   if (json.data) renderGlobal(json.data);
 }
 
 async function fetchTA() {
-  const res = await fetch('/api/ta/bitcoin');
+  const res = await fetch(apiUrl('/api/ta/bitcoin'));
   const data = await res.json();
   if (data.rsi != null) renderTA(data);
 }
 
 async function fetchNews() {
-  const res = await fetch('/api/news');
+  const res = await fetch(apiUrl('/api/news'));
   const data = await res.json();
   if (Array.isArray(data) && data.length) renderNews(data);
 }
 
 async function fetchMining(range) {
-  var url = '/api/mining' + (range ? '?range=' + range : '');
+  var url = apiUrl('/api/mining' + (range ? '?range=' + range : ''));
   var res = await fetch(url);
   var data = await res.json();
   if (data.adjustment) renderMining(data);
@@ -196,7 +219,7 @@ function loadMining(range, btn) {
 }
 
 async function fetchMacro(range) {
-  var url = '/api/macro' + (range ? '?range=' + range : '');
+  var url = apiUrl('/api/macro' + (range ? '?range=' + range : ''));
   var res = await fetch(url);
   var data = await res.json();
   if (data && typeof data === 'object') renderMacro(data);
@@ -211,7 +234,7 @@ function loadMacro(range, btn) {
 }
 
 async function fetchLightning(range) {
-  var url = '/api/lightning' + (range ? '?range=' + range : '');
+  var url = apiUrl('/api/lightning' + (range ? '?range=' + range : ''));
   var res = await fetch(url);
   var data = await res.json();
   if (data.channels) renderLightning(data);
@@ -226,7 +249,7 @@ function loadLightning(range, btn) {
 }
 
 async function fetchXPosts() {
-  const res = await fetch('/api/x-posts');
+  const res = await fetch(apiUrl('/api/x-posts'));
   const data = await res.json();
   if (Array.isArray(data) && data.length) renderXPosts(data);
 }
@@ -239,7 +262,7 @@ async function loadChart(coin, days, btn) {
     btn.classList.add('active');
   }
   lastChartRange = { type: 'short', value: days };
-  var res = await fetch('/api/chart/' + coin + '/' + days + '?vs=' + currentCurrency);
+  var res = await fetch(apiUrl('/api/chart/' + coin + '/' + days + '?vs=' + currentCurrency));
   var data = await res.json();
   if (data.prices) renderBTCChart(data.prices, days);
 }
@@ -250,7 +273,7 @@ async function loadChartLong(range, btn) {
     btn.classList.add('active');
   }
   lastChartRange = { type: 'long', value: range };
-  var res = await fetch('/api/chart-long/' + range);
+  var res = await fetch(apiUrl('/api/chart-long/' + range));
   var data = await res.json();
   if (data.prices) renderBTCChart(data.prices, range);
 }

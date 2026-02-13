@@ -180,15 +180,89 @@ function cached(key, ttlMs, fetchFn) {
 }
 
 // Prices — cache 60s (with currency support)
+// Strategy:
+// - USD pricing for coins comes from Binance (more reliable, avoids CoinGecko 429 loops).
+// - Fiat conversion uses our existing CoinGecko exchange-rate endpoint (cached heavily).
+// - Market cap / sparkline fields still come from CoinGecko as "nice to have"; if CG 429s we still return prices.
 app.get('/api/prices', async (req, res) => {
   const vs = (req.query.vs || 'usd').toLowerCase();
   const key = 'prices-' + vs;
-  const handler = cached(key, 60000, async () => {
-    const url = 'https://api.coingecko.com/api/v3/coins/markets?vs_currency=' + encodeURIComponent(vs) + '&ids=bitcoin,ethereum,solana,cardano,avalanche-2,chainlink,polkadot,dogecoin&order=market_cap_desc&sparkline=true&price_change_percentage=1h,24h,7d,30d';
-    const resp = await coingeckoFetch(url, { signal: AbortSignal.timeout(10000) });
-    if (!resp.ok) throw new Error('CoinGecko ' + resp.status);
-    return resp.json();
+
+  const handler = cached(key, 60000, async (req) => {
+    const ids = ['bitcoin','ethereum','solana','cardano','avalanche-2','chainlink','polkadot','dogecoin'];
+    const binance = {
+      bitcoin: 'BTCUSDT',
+      ethereum: 'ETHUSDT',
+      solana: 'SOLUSDT',
+      cardano: 'ADAUSDT',
+      'avalanche-2': 'AVAXUSDT',
+      chainlink: 'LINKUSDT',
+      polkadot: 'DOTUSDT',
+      dogecoin: 'DOGEUSDT'
+    };
+
+    // 1) Get USD prices (24h change too) from Binance
+    const binanceSymbols = ids.map(id => binance[id]).filter(Boolean);
+    const tickerUrl = 'https://api.binance.com/api/v3/ticker/24hr?symbols=' + encodeURIComponent(JSON.stringify(binanceSymbols));
+    const tResp = await fetch(tickerUrl, { signal: AbortSignal.timeout(10000) });
+    if (!tResp.ok) throw new Error('Binance ' + tResp.status);
+    const tickers = await tResp.json();
+    const bySymbol = {};
+    tickers.forEach(t => { bySymbol[t.symbol] = t; });
+
+    // 2) Get conversion rate from USD -> vs (cached endpoint). For USD, rate=1.
+    let usdToVs = 1;
+    if (vs !== 'usd') {
+      // reuse our own endpoint to keep all logic in one place
+      const exUrl = 'http://127.0.0.1:' + PORT + '/api/exchange-rate?vs=' + encodeURIComponent(vs);
+      const exResp = await fetch(exUrl, { signal: AbortSignal.timeout(10000) });
+      if (exResp.ok) {
+        const ex = await exResp.json();
+        if (ex && ex.rate) usdToVs = ex.rate;
+      }
+    }
+
+    // 3) Optional CoinGecko enrichment: market cap + sparkline + % changes in target currency
+    let cgMap = {};
+    try {
+      const cgUrl = 'https://api.coingecko.com/api/v3/coins/markets?vs_currency=' + encodeURIComponent(vs) + '&ids=' + ids.join(',') + '&order=market_cap_desc&sparkline=true&price_change_percentage=1h,24h,7d,30d';
+      const cgResp = await coingeckoFetch(cgUrl, { signal: AbortSignal.timeout(10000) });
+      if (cgResp.ok) {
+        const cg = await cgResp.json();
+        (cg || []).forEach(c => { cgMap[c.id] = c; });
+      }
+    } catch (e) { /* ignore CG failures */ }
+
+    // 4) Build response in the same shape the frontend expects
+    const out = ids.map((id) => {
+      const sym = binance[id];
+      const t = bySymbol[sym];
+      const usd = t ? parseFloat(t.lastPrice) : null;
+      const curPrice = (usd != null) ? (usd * usdToVs) : null;
+
+      const cg = cgMap[id] || {};
+
+      // If CG didn’t load, we still provide key fields so UI can render.
+      return {
+        id,
+        symbol: (cg.symbol || (id === 'avalanche-2' ? 'avax' : id.slice(0, 3))).toLowerCase(),
+        name: cg.name || (id === 'avalanche-2' ? 'Avalanche' : id.charAt(0).toUpperCase() + id.slice(1)),
+        image: cg.image || '',
+        current_price: curPrice,
+        market_cap: cg.market_cap || null,
+        total_volume: cg.total_volume || null,
+        sparkline_in_7d: cg.sparkline_in_7d || null,
+        price_change_percentage_1h_in_currency: cg.price_change_percentage_1h_in_currency ?? null,
+        price_change_percentage_24h_in_currency: (cg.price_change_percentage_24h_in_currency ?? (t ? parseFloat(t.priceChangePercent) : null)),
+        price_change_percentage_7d_in_currency: cg.price_change_percentage_7d_in_currency ?? null,
+        price_change_percentage_30d_in_currency: cg.price_change_percentage_30d_in_currency ?? null,
+        ath_date: cg.ath_date || null,
+      };
+    }).filter(x => x.current_price != null);
+
+    return out;
   });
+
   return handler(req, res);
 });
 

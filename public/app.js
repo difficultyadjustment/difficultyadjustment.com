@@ -433,8 +433,8 @@ function renderPriceTable(coins, btc) {
       '<td class="' + (pct24h >= 0 ? 'positive' : 'negative') + '">' + fmt.pct(pct24h) + '</td>' +
       '<td class="' + (pct7d >= 0 ? 'positive' : 'negative') + '">' + fmt.pct(pct7d) + '</td>' +
       '<td class="' + (vsBtc >= 0 ? 'positive' : 'negative') + '">' + fmt.pct(vsBtc) + '</td>' +
-      '<td class="mcap-cell">' + fmt.mcap(c.market_cap) + '</td>' +
-      '<td class="sparkline-cell"><canvas id="' + sparkId + '" width="120" height="40"></canvas></td>' +
+      '<td class="mcap-cell mcap-col">' + fmt.mcap(c.market_cap) + '</td>' +
+      '<td class="sparkline-cell sparkline-col"><canvas id="' + sparkId + '" width="120" height="40"></canvas></td>' +
     '</tr>';
   }).join('');
 

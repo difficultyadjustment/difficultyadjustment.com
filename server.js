@@ -684,8 +684,9 @@ app.get('/api/health', (req, res) => {
 async function warmCache() {
   // Non-CoinGecko endpoints first (no rate limit concerns)
   const safeFirst = ['/api/fear-greed', '/api/mining', '/api/news', '/api/lightning', '/api/x-posts'];
-  // CoinGecko endpoints — space these out heavily
-  const cgEndpoints = ['/api/macro', '/api/prices', '/api/global', '/api/chart/bitcoin/1', '/api/ta/bitcoin'];
+  // CoinGecko endpoints — keep this minimal; warmCache runs at every deploy/restart
+  // and CoinGecko free tier will 429 if we burst.
+  const cgEndpoints = ['/api/prices', '/api/global'];
 
   console.log('⏳ Warming cache (safe endpoints)...');
   for (const ep of safeFirst) {

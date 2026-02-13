@@ -723,99 +723,135 @@ app.get('/api/x-posts', cached('xposts', 600000, async () => {
 }));
 
 // TA — pure JS implementation (no Python dependency), cache 300s
+// Use Coinbase BTC-USD candles to avoid CoinGecko 429 loops.
 app.get('/api/ta/:coin', async (req, res) => {
   const coin = req.params.coin;
   const key = 'ta-' + coin;
+
   const handler = cached(key, 300000, async () => {
-    // Fetch 90 days of daily data for TA calculations
-    const url = `https://api.coingecko.com/api/v3/coins/${encodeURIComponent(coin)}/market_chart?vs_currency=usd&days=90`;
-    const resp = await coingeckoFetch(url, { signal: AbortSignal.timeout(15000) });
-    if (!resp.ok) throw new Error('CoinGecko ' + resp.status);
-    const data = await resp.json();
-    const prices = (data.prices || []).map(p => p[1]);
+    // Only support BTC TA for now; anything else falls back to CoinGecko
+    if (String(coin).toLowerCase() !== 'bitcoin') {
+      const url = `https://api.coingecko.com/api/v3/coins/${encodeURIComponent(coin)}/market_chart?vs_currency=usd&days=90`;
+      const resp = await coingeckoFetch(url, { signal: AbortSignal.timeout(15000) });
+      if (!resp.ok) throw new Error('CoinGecko ' + resp.status);
+      const data = await resp.json();
+      const prices = (data.prices || []).map(p => p[1]);
+      if (prices.length < 50) throw new Error('Not enough data');
+      return computeTA(prices);
+    }
+
+    // Coinbase daily candles (90d) with chunking (max 300 per call)
+    const gran = 86400;
+    const end = Math.floor(Date.now() / 1000);
+    const start = end - 90 * 86400;
+
+    async function fetchChunk(s, e) {
+      const url = 'https://api.exchange.coinbase.com/products/BTC-USD/candles?granularity=' + gran + '&start=' + new Date(s * 1000).toISOString() + '&end=' + new Date(e * 1000).toISOString();
+      const resp = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(15000) });
+      if (!resp.ok) throw new Error('Coinbase ' + resp.status);
+      return resp.json();
+    }
+
+    const maxSpan = gran * 300;
+    const chunks = [];
+    for (let s = start; s < end; s += maxSpan) {
+      const e = Math.min(end, s + maxSpan);
+      chunks.push([s, e]);
+    }
+
+    const results = await Promise.allSettled(chunks.map(([s, e]) => fetchChunk(s, e)));
+    const candles = [];
+    results.forEach(r => {
+      if (r.status === 'fulfilled' && Array.isArray(r.value)) candles.push(...r.value);
+    });
+
+    // [time, low, high, open, close, volume]
+    const prices = candles
+      .map(c => parseFloat(c[4]))
+      .filter(v => isFinite(v));
+
     if (prices.length < 50) throw new Error('Not enough data');
-
-    const price = prices[prices.length - 1];
-
-    // RSI (14-period)
-    const rsiPeriod = 14;
-    let gains = 0, losses = 0;
-    for (let i = prices.length - rsiPeriod; i < prices.length; i++) {
-      const diff = prices[i] - prices[i - 1];
-      if (diff > 0) gains += diff; else losses -= diff;
-    }
-    const avgGain = gains / rsiPeriod;
-    const avgLoss = losses / rsiPeriod;
-    const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
-    const rsi = 100 - (100 / (1 + rs));
-
-    // SMA
-    const sma = (arr, period) => {
-      const slice = arr.slice(-period);
-      return slice.reduce((a, b) => a + b, 0) / slice.length;
-    };
-    const sma_20 = sma(prices, 20);
-    const sma_50 = sma(prices, 50);
-
-    // EMA
-    const ema = (arr, period) => {
-      const k = 2 / (period + 1);
-      let e = arr[0];
-      for (let i = 1; i < arr.length; i++) e = arr[i] * k + e * (1 - k);
-      return e;
-    };
-    const ema_12 = ema(prices, 12);
-    const ema_26 = ema(prices, 26);
-
-    // MACD
-    const macd_line = ema_12 - ema_26;
-    // Signal line (9-period EMA of MACD) - approximate
-    const macdVals = [];
-    for (let i = 26; i < prices.length; i++) {
-      const e12 = ema(prices.slice(0, i + 1), 12);
-      const e26 = ema(prices.slice(0, i + 1), 26);
-      macdVals.push(e12 - e26);
-    }
-    const signal_line = macdVals.length >= 9 ? ema(macdVals, 9) : 0;
-
-    // Bollinger Bands (20-period, 2 std dev)
-    const bb_sma = sma_20;
-    const bb_slice = prices.slice(-20);
-    const bb_std = Math.sqrt(bb_slice.reduce((sum, p) => sum + Math.pow(p - bb_sma, 2), 0) / 20);
-    const bb_upper = bb_sma + 2 * bb_std;
-    const bb_lower = bb_sma - 2 * bb_std;
-
-    // Support/Resistance (simple: recent lows/highs)
-    const recent = prices.slice(-30);
-    const supports = [];
-    const resistances = [];
-    for (let i = 2; i < recent.length - 2; i++) {
-      if (recent[i] < recent[i-1] && recent[i] < recent[i-2] && recent[i] < recent[i+1] && recent[i] < recent[i+2]) {
-        supports.push(recent[i]);
-      }
-      if (recent[i] > recent[i-1] && recent[i] > recent[i-2] && recent[i] > recent[i+1] && recent[i] > recent[i+2]) {
-        resistances.push(recent[i]);
-      }
-    }
-
-    return {
-      price,
-      rsi,
-      sma_20,
-      sma_50,
-      ema_12,
-      ema_26,
-      macd_line,
-      signal_line,
-      bb_upper,
-      bb_lower,
-      bb_sma,
-      supports,
-      resistances,
-    };
+    return computeTA(prices);
   });
+
   return handler(req, res);
 });
+
+function computeTA(prices) {
+  const price = prices[prices.length - 1];
+
+  // RSI (14-period)
+  const rsiPeriod = 14;
+  let gains = 0, losses = 0;
+  for (let i = prices.length - rsiPeriod; i < prices.length; i++) {
+    const diff = prices[i] - prices[i - 1];
+    if (diff > 0) gains += diff; else losses -= diff;
+  }
+  const avgGain = gains / rsiPeriod;
+  const avgLoss = losses / rsiPeriod;
+  const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+  const rsi = 100 - (100 / (1 + rs));
+
+  // SMA
+  const sma = (arr, period) => {
+    const slice = arr.slice(-period);
+    return slice.reduce((a, b) => a + b, 0) / slice.length;
+  };
+  const sma_20 = sma(prices, 20);
+  const sma_50 = sma(prices, 50);
+
+  // EMA
+  const ema = (arr, period) => {
+    const k = 2 / (period + 1);
+    let e = arr[0];
+    for (let i = 1; i < arr.length; i++) e = arr[i] * k + e * (1 - k);
+    return e;
+  };
+  const ema_12 = ema(prices, 12);
+  const ema_26 = ema(prices, 26);
+
+  // MACD
+  const macd_line = ema_12 - ema_26;
+  const macdVals = [];
+  for (let i = 26; i < prices.length; i++) {
+    const e12 = ema(prices.slice(0, i + 1), 12);
+    const e26 = ema(prices.slice(0, i + 1), 26);
+    macdVals.push(e12 - e26);
+  }
+  const signal_line = macdVals.length >= 9 ? ema(macdVals, 9) : 0;
+
+  // Bollinger Bands (20-period, 2 std dev)
+  const bb_sma = sma_20;
+  const bb_slice = prices.slice(-20);
+  const bb_std = Math.sqrt(bb_slice.reduce((sum, p) => sum + Math.pow(p - bb_sma, 2), 0) / 20);
+  const bb_upper = bb_sma + 2 * bb_std;
+  const bb_lower = bb_sma - 2 * bb_std;
+
+  // Support/Resistance (simple: recent lows/highs)
+  const recent = prices.slice(-30);
+  const supports = [];
+  const resistances = [];
+  for (let i = 2; i < recent.length - 2; i++) {
+    if (recent[i] < recent[i-1] && recent[i] < recent[i-2] && recent[i] < recent[i+1] && recent[i] < recent[i+2]) supports.push(recent[i]);
+    if (recent[i] > recent[i-1] && recent[i] > recent[i-2] && recent[i] > recent[i+1] && recent[i] > recent[i+2]) resistances.push(recent[i]);
+  }
+
+  return {
+    price,
+    rsi,
+    sma_20,
+    sma_50,
+    ema_12,
+    ema_26,
+    macd_line,
+    signal_line,
+    bb_upper,
+    bb_lower,
+    bb_sma,
+    supports,
+    resistances,
+  };
+}
 
 // Historical difficulty adjustments — cache 1 hour
 app.get('/api/difficulty-history', cached('diff-history', 3600000, async () => {

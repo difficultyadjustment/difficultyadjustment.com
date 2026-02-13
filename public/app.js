@@ -80,6 +80,20 @@ function createGradient(ctx, color, height) {
   return gradient;
 }
 
+// Mobile: allow tapping Tools dropdown to open/close
+function toggleMobileToolsMenu(e) {
+  try { e.preventDefault(); e.stopPropagation(); } catch (err) {}
+  const dd = (e && e.target) ? e.target.closest('.nav-dropdown') : null;
+  if (!dd) return;
+  dd.classList.toggle('open');
+}
+
+document.addEventListener('click', function() {
+  document.querySelectorAll('.nav-dropdown.open').forEach(function(dd) {
+    dd.classList.remove('open');
+  });
+});
+
 // ===== FETCH FUNCTIONS =====
 
 async function fetchPrices() {

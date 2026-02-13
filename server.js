@@ -267,16 +267,50 @@ app.get('/api/prices', async (req, res) => {
 });
 
 // Chart — cache 120s per coin/days/currency combo
+// Primary for BTC: Binance klines (more reliable than CoinGecko). Fallback to CoinGecko for others.
 app.get('/api/chart/:coin/:days', async (req, res) => {
   const { coin, days } = req.params;
   const vs = (req.query.vs || 'usd').toLowerCase();
   const key = `chart-${coin}-${days}-${vs}`;
+
   const handler = cached(key, 120000, async () => {
+    const d = parseInt(days, 10);
+    const isBtc = String(coin).toLowerCase() === 'bitcoin';
+
+    // BTC short-range chart: Binance only supports USDT pairs. We return USD-ish and let client format currency.
+    if (isBtc && Number.isFinite(d) && d > 0 && d <= 365) {
+      // Interval selection
+      let interval = '1h';
+      if (d <= 2) interval = '15m';
+      else if (d <= 7) interval = '1h';
+      else if (d <= 90) interval = '4h';
+      else interval = '1d';
+
+      // Binance limit max 1000; we’ll estimate.
+      const points = (function() {
+        if (interval === '15m') return Math.min(1000, d * 96);
+        if (interval === '1h') return Math.min(1000, d * 24);
+        if (interval === '4h') return Math.min(1000, d * 6);
+        return Math.min(1000, d);
+      })();
+
+      const url = 'https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=' + interval + '&limit=' + points;
+      const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
+      if (!resp.ok) throw new Error('Binance ' + resp.status);
+      const klines = await resp.json();
+
+      // Convert to CoinGecko-like shape: { prices: [[ms, price], ...] }
+      const prices = (klines || []).map(k => [k[0], parseFloat(k[4])]).filter(p => isFinite(p[0]) && isFinite(p[1]));
+      return { prices, source: 'binance', vs: 'usd' };
+    }
+
+    // Fallback: CoinGecko market_chart (alts, or if BTC params are weird)
     const url = `https://api.coingecko.com/api/v3/coins/${encodeURIComponent(coin)}/market_chart?vs_currency=${encodeURIComponent(vs)}&days=${encodeURIComponent(days)}`;
     const resp = await coingeckoFetch(url, { signal: AbortSignal.timeout(10000) });
     if (!resp.ok) throw new Error('CoinGecko ' + resp.status);
     return resp.json();
   });
+
   return handler(req, res);
 });
 

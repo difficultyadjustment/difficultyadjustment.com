@@ -1438,8 +1438,16 @@ body {
   .refresh-btn { padding: 8px 12px; }
   .currency-select { padding: 8px 10px; }
 
-  /* Nav hidden on mobile (kept as-is) */
-  .site-nav { display: none; }
+  /* Mobile nav: show as horizontal scroll */
+  .site-nav { display: flex; overflow-x: auto; gap: 8px; margin-left: 0; padding: 6px 0 2px; -webkit-overflow-scrolling: touch; }
+  .site-nav::-webkit-scrollbar { display: none; }
+  .nav-link { flex: 0 0 auto; }
+
+  /* Dropdown: tap to open */
+  .nav-dropdown-menu { position: static; padding-top: 0; }
+  .nav-dropdown:hover .nav-dropdown-menu { display: none; }
+  .nav-dropdown.open .nav-dropdown-menu { display: block; }
+  .nav-dropdown-menu-inner { min-width: 0; }
 
   /* Stats bar: swipeable cards instead of ugly wrap */
   .stats-bar { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scroll-snap-type: x mandatory; gap: 12px; padding-bottom: 8px; }
@@ -1459,8 +1467,11 @@ body {
   .news-list-source { display: none; }
 }
 
+/* Mobile dropdown toggle helper */
+.nav-dropdown.open .nav-dropdown-menu { display: block; }
+
 @media (max-width: 1024px) {
-  .site-nav { display: none; }
+  /* keep nav visible; we handle the mobile layout at 640px */
 }
 
 .ta-loading {

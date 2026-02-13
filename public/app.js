@@ -88,11 +88,15 @@ function toggleMobileToolsMenu(e) {
   dd.classList.toggle('open');
 }
 
-document.addEventListener('click', function() {
+function closeAllNavDropdowns() {
   document.querySelectorAll('.nav-dropdown.open').forEach(function(dd) {
     dd.classList.remove('open');
   });
-});
+}
+
+document.addEventListener('click', closeAllNavDropdowns);
+// iOS Safari can be picky about click delay; also listen for touchstart
+document.addEventListener('touchstart', closeAllNavDropdowns, { passive: true });
 
 // ===== FETCH FUNCTIONS =====
 

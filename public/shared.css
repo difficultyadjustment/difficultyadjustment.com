@@ -250,7 +250,22 @@ body {
 
 @media (max-width: 640px) {
   .app { padding: 0 12px; }
-  .header { flex-direction: column; align-items: stretch; gap: 12px; }
+
+  /* Sticky mobile header (iOS notch-safe) */
+  .header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 200;
+    background: rgba(10, 10, 15, 0.92);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding-top: calc(12px + env(safe-area-inset-top));
+    margin-bottom: 16px;
+  }
+
   .page-hero h2 { font-size: 28px; }
 
   /* Mobile nav: horizontal scroll chips (simple + reliable) */

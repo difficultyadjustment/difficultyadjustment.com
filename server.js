@@ -366,12 +366,40 @@ app.get('/api/fear-greed', cached('fng', 300000, async () => {
 }));
 
 // Global — cache 10 min (serve stale if rate-limited)
-app.get('/api/global', cached('global', 600000, async () => {
-  const url = 'https://api.coingecko.com/api/v3/global';
-  const resp = await coingeckoFetch(url, { signal: AbortSignal.timeout(10000) });
-  if (!resp.ok) throw new Error('CoinGecko ' + resp.status);
-  return resp.json();
-}));
+// Note: if CoinGecko 429s and we have no cache yet, return a minimal object
+// so the frontend doesn’t look "dead".
+app.get('/api/global', async (req, res) => {
+  const key = 'global';
+  const now = Date.now();
+  const ttlMs = 600000;
+
+  if (apiCache[key] && (now - apiCache[key].ts) < ttlMs) {
+    return res.json(apiCache[key].data);
+  }
+
+  try {
+    const url = 'https://api.coingecko.com/api/v3/global';
+    const resp = await coingeckoFetch(url, { signal: AbortSignal.timeout(10000) });
+    if (!resp.ok) throw new Error('CoinGecko ' + resp.status);
+    const data = await resp.json();
+    apiCache[key] = { data, ts: Date.now() };
+    return res.json(data);
+  } catch (e) {
+    // Serve stale if present
+    if (apiCache[key]) return res.json(apiCache[key].data);
+
+    // Minimal fallback (keeps UI populated until CG recovers)
+    return res.status(200).json({
+      data: {
+        market_cap_percentage: { btc: null },
+        total_market_cap: { usd: null },
+        total_volume: { usd: null },
+        market_cap_change_percentage_24h_usd: null
+      },
+      error: (e && e.message) ? String(e.message) : 'global unavailable'
+    });
+  }
+});
 
 // Bitcoin News — cache 300s
 app.get('/api/news', cached('news', 300000, async () => {

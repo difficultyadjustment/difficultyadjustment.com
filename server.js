@@ -131,7 +131,7 @@ const apiCache = {};
 // Global CoinGecko rate limiter (simple queue). Prevents bursts across endpoints.
 let cgQueue = Promise.resolve();
 let cgLastAt = 0;
-const COINGECKO_MIN_INTERVAL_MS = parseInt(process.env.COINGECKO_MIN_INTERVAL_MS || '1500', 10);
+const COINGECKO_MIN_INTERVAL_MS = parseInt(process.env.COINGECKO_MIN_INTERVAL_MS || '4000', 10);
 async function coingeckoFetch(url, opts = {}) {
   cgQueue = cgQueue.then(async () => {
     const wait = Math.max(0, COINGECKO_MIN_INTERVAL_MS - (Date.now() - cgLastAt));
@@ -365,8 +365,8 @@ app.get('/api/fear-greed', cached('fng', 300000, async () => {
   return resp.json();
 }));
 
-// Global — cache 120s
-app.get('/api/global', cached('global', 120000, async () => {
+// Global — cache 10 min (serve stale if rate-limited)
+app.get('/api/global', cached('global', 600000, async () => {
   const url = 'https://api.coingecko.com/api/v3/global';
   const resp = await coingeckoFetch(url, { signal: AbortSignal.timeout(10000) });
   if (!resp.ok) throw new Error('CoinGecko ' + resp.status);

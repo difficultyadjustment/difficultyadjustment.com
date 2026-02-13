@@ -127,26 +127,53 @@ app.get('/hodl', (req, res) => {
 
 // In-memory cache to avoid hammering free APIs
 const apiCache = {};
+
+// Global CoinGecko rate limiter (simple queue). Prevents bursts across endpoints.
+let cgQueue = Promise.resolve();
+let cgLastAt = 0;
+const COINGECKO_MIN_INTERVAL_MS = parseInt(process.env.COINGECKO_MIN_INTERVAL_MS || '1500', 10);
+async function coingeckoFetch(url, opts = {}) {
+  cgQueue = cgQueue.then(async () => {
+    const wait = Math.max(0, COINGECKO_MIN_INTERVAL_MS - (Date.now() - cgLastAt));
+    if (wait) await new Promise(r => setTimeout(r, wait));
+    cgLastAt = Date.now();
+  }).catch(() => {});
+  await cgQueue;
+  return fetch(url, opts);
+}
+
 function cached(key, ttlMs, fetchFn) {
   return async (req, res) => {
     const now = Date.now();
-    if (apiCache[key] && (now - apiCache[key].ts) < ttlMs) {
-      return res.json(apiCache[key].data);
+    const entry = apiCache[key];
+    if (entry && (now - entry.ts) < ttlMs) {
+      return res.json(entry.data);
     }
-    // Try up to 2 times with a delay for rate limits
-    for (let attempt = 0; attempt < 2; attempt++) {
+
+    // Retry a few times on rate limits; prefer returning stale cache over hard failure.
+    const maxAttempts = 4;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
         const data = await fetchFn(req);
-        apiCache[key] = { data, ts: now };
+        apiCache[key] = { data, ts: Date.now() };
         return res.json(data);
       } catch (e) {
-        if (attempt === 0 && e.message && e.message.includes('429')) {
-          await new Promise(r => setTimeout(r, 3000)); // wait 3s and retry
+        const msg = (e && e.message) ? String(e.message) : 'Request failed';
+        const is429 = msg.includes('429');
+
+        // If we have stale data, serve it.
+        if (apiCache[key]) return res.json(apiCache[key].data);
+
+        // Backoff on 429 and retry.
+        if (is429 && attempt < maxAttempts - 1) {
+          const delay = 3000 + attempt * 4000; // 3s, 7s, 11s...
+          await new Promise(r => setTimeout(r, delay));
           continue;
         }
-        // Return stale cache if available
-        if (apiCache[key]) return res.json(apiCache[key].data);
-        return res.status(500).json({ error: e.message });
+
+        // Propagate an honest status code (429 if rate limited, else 500)
+        if (is429) return res.status(429).json({ error: 'CoinGecko 429' });
+        return res.status(500).json({ error: msg });
       }
     }
   };
@@ -158,7 +185,7 @@ app.get('/api/prices', async (req, res) => {
   const key = 'prices-' + vs;
   const handler = cached(key, 60000, async () => {
     const url = 'https://api.coingecko.com/api/v3/coins/markets?vs_currency=' + encodeURIComponent(vs) + '&ids=bitcoin,ethereum,solana,cardano,avalanche-2,chainlink,polkadot,dogecoin&order=market_cap_desc&sparkline=true&price_change_percentage=1h,24h,7d,30d';
-    const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    const resp = await coingeckoFetch(url, { signal: AbortSignal.timeout(10000) });
     if (!resp.ok) throw new Error('CoinGecko ' + resp.status);
     return resp.json();
   });
@@ -172,7 +199,7 @@ app.get('/api/chart/:coin/:days', async (req, res) => {
   const key = `chart-${coin}-${days}-${vs}`;
   const handler = cached(key, 120000, async () => {
     const url = `https://api.coingecko.com/api/v3/coins/${encodeURIComponent(coin)}/market_chart?vs_currency=${encodeURIComponent(vs)}&days=${encodeURIComponent(days)}`;
-    const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    const resp = await coingeckoFetch(url, { signal: AbortSignal.timeout(10000) });
     if (!resp.ok) throw new Error('CoinGecko ' + resp.status);
     return resp.json();
   });
@@ -186,7 +213,7 @@ app.get('/api/exchange-rate', async (req, res) => {
   const key = 'exrate-' + vs;
   const handler = cached(key, 600000, async () => {
     const url = 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd,' + encodeURIComponent(vs);
-    const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    const resp = await coingeckoFetch(url, { signal: AbortSignal.timeout(10000) });
     if (!resp.ok) throw new Error('CoinGecko rate ' + resp.status);
     const data = await resp.json();
     const usdPrice = data.bitcoin?.usd || 1;
@@ -207,7 +234,7 @@ app.get('/api/fear-greed', cached('fng', 300000, async () => {
 // Global — cache 120s
 app.get('/api/global', cached('global', 120000, async () => {
   const url = 'https://api.coingecko.com/api/v3/global';
-  const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
+  const resp = await coingeckoFetch(url, { signal: AbortSignal.timeout(10000) });
   if (!resp.ok) throw new Error('CoinGecko ' + resp.status);
   return resp.json();
 }));
@@ -540,7 +567,7 @@ app.get('/api/ta/:coin', async (req, res) => {
   const handler = cached(key, 300000, async () => {
     // Fetch 90 days of daily data for TA calculations
     const url = `https://api.coingecko.com/api/v3/coins/${encodeURIComponent(coin)}/market_chart?vs_currency=usd&days=90`;
-    const resp = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    const resp = await coingeckoFetch(url, { signal: AbortSignal.timeout(15000) });
     if (!resp.ok) throw new Error('CoinGecko ' + resp.status);
     const data = await resp.json();
     const prices = (data.prices || []).map(p => p[1]);

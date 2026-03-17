@@ -725,12 +725,15 @@ app.get('/api/x-posts', cached('xposts', 600000, async () => {
 // TA — pure JS implementation (no Python dependency), cache 300s
 // Use Coinbase BTC-USD candles to avoid CoinGecko 429 loops.
 app.get('/api/ta/:coin', async (req, res) => {
-  const coin = req.params.coin;
+  // Frontend historically calls this with :coin=bucket symbols like "btc".
+  // Normalize aliases so we don't accidentally hit CoinGecko with an invalid id.
+  const rawCoin = String(req.params.coin || '').toLowerCase();
+  const coin = (rawCoin === 'btc') ? 'bitcoin' : rawCoin;
   const key = 'ta-' + coin;
 
   const handler = cached(key, 300000, async () => {
     // Only support BTC TA for now; anything else falls back to CoinGecko
-    if (String(coin).toLowerCase() !== 'bitcoin') {
+    if (coin !== 'bitcoin') {
       const url = `https://api.coingecko.com/api/v3/coins/${encodeURIComponent(coin)}/market_chart?vs_currency=usd&days=90`;
       const resp = await coingeckoFetch(url, { signal: AbortSignal.timeout(15000) });
       if (!resp.ok) throw new Error('CoinGecko ' + resp.status);

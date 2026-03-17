@@ -103,9 +103,19 @@ function closeAllNavDropdowns() {
   });
 }
 
-document.addEventListener('click', closeAllNavDropdowns);
-// iOS Safari can be picky about click delay; also listen for touchstart
-document.addEventListener('touchstart', closeAllNavDropdowns, { passive: true });
+// Close dropdowns when tapping/clicking outside the nav dropdown.
+// On iOS Safari, a tap triggers touchstart first; our previous global touchstart
+// handler could close the menu before the button's onclick fires.
+function handleOutsideNavDropdown(e) {
+  try {
+    if (e && e.target && e.target.closest && e.target.closest('.nav-dropdown')) return;
+  } catch (err) {}
+  closeAllNavDropdowns();
+}
+
+document.addEventListener('click', handleOutsideNavDropdown);
+// iOS Safari: keep passive, but ignore taps on the dropdown itself.
+document.addEventListener('touchstart', handleOutsideNavDropdown, { passive: true });
 
 function setPwaStatus(mode) {
   var bar = document.getElementById('pwaStatus');

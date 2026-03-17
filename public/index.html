@@ -50,7 +50,7 @@
       <div class="header-right">
         <div class="live-dot"></div>
         <span class="last-update" id="lastUpdate">Loading...</span>
-        <button class="refresh-btn" onclick="refreshAll()">↻</button>
+        <button class="refresh-btn" onclick="hardRefreshData()" title="Force refresh (bypass cache)">↻</button>
         <select class="currency-select" id="currencySelect" onchange="changeCurrency(this.value)">
           <option value="usd">USD $</option>
           <option value="cad">CAD $</option>

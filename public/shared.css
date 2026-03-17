@@ -165,6 +165,17 @@ body {
   color: var(--accent);
 }
 
+/* Shitcoin mode: make everything rainbow. */
+:root[data-theme="shitcoin"] {
+  filter: hue-rotate(0deg) saturate(1.35) contrast(1.05);
+  animation: da-rainbow 6s linear infinite;
+}
+
+@keyframes da-rainbow {
+  0% { filter: hue-rotate(0deg) saturate(1.35) contrast(1.05); }
+  100% { filter: hue-rotate(360deg) saturate(1.35) contrast(1.05); }
+}
+
 .header-right {
   display: flex;
   align-items: center;

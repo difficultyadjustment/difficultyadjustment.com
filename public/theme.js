@@ -3,26 +3,10 @@
 
 (function () {
   var STORAGE_KEY = 'da_theme';
+  // Order matters: dropdown will follow insertion order.
   var THEMES = {
-    blue: {
-      name: 'Blue (Default)',
-      vars: {
-        '--accent': '#4da3ff',
-        '--accent-dim': 'rgba(77, 163, 255, 0.16)',
-        '--accent-glow': 'rgba(77, 163, 255, 0.10)',
-        '--bg-primary': '#070a12',
-        '--bg-secondary': '#0b1020',
-        '--bg-card': '#0f1730',
-        '--bg-card-hover': '#132045',
-        '--border': '#1b2a4d',
-        '--border-light': '#243763',
-        '--text-primary': '#eaf0ff',
-        '--text-secondary': '#b1c0e8',
-        '--text-muted': '#7f93c8'
-      }
-    },
-    orange: {
-      name: 'Orange (Bitcoin Classic)',
+    bitcoin: {
+      name: 'Bitcoin (Original)',
       vars: {
         '--accent': '#f7931a',
         '--accent-dim': 'rgba(247, 147, 26, 0.15)',
@@ -36,6 +20,23 @@
         '--text-primary': '#e8e8f0',
         '--text-secondary': '#94a3b8',
         '--text-muted': '#64748b'
+      }
+    },
+    midnight: {
+      name: 'Midnight Lightning',
+      vars: {
+        '--accent': '#4da3ff',
+        '--accent-dim': 'rgba(77, 163, 255, 0.16)',
+        '--accent-glow': 'rgba(77, 163, 255, 0.10)',
+        '--bg-primary': '#070a12',
+        '--bg-secondary': '#0b1020',
+        '--bg-card': '#0f1730',
+        '--bg-card-hover': '#132045',
+        '--border': '#1b2a4d',
+        '--border-light': '#243763',
+        '--text-primary': '#eaf0ff',
+        '--text-secondary': '#b1c0e8',
+        '--text-muted': '#7f93c8'
       }
     },
     purple: {
@@ -71,6 +72,23 @@
         '--text-secondary': '#b7f2cf',
         '--text-muted': '#78c59f'
       }
+    },
+    shitcoin: {
+      name: 'Shitcoin (Rainbow)',
+      vars: {
+        '--accent': '#ff4dd2',
+        '--accent-dim': 'rgba(255, 77, 210, 0.18)',
+        '--accent-glow': 'rgba(255, 77, 210, 0.12)',
+        '--bg-primary': '#08040a',
+        '--bg-secondary': '#12081a',
+        '--bg-card': '#160b22',
+        '--bg-card-hover': '#1d0f2f',
+        '--border': '#3a1a49',
+        '--border-light': '#52245f',
+        '--text-primary': '#fff1fb',
+        '--text-secondary': '#ffd1f1',
+        '--text-muted': '#f0a9dd'
+      }
     }
   };
 
@@ -79,7 +97,8 @@
       var id = localStorage.getItem(STORAGE_KEY);
       if (id && THEMES[id]) return id;
     } catch (e) {}
-    return 'blue';
+    // Default to the original Bitcoin theme
+    return 'bitcoin';
   }
 
   function safeSetThemeId(id) {
@@ -87,7 +106,7 @@
   }
 
   function applyTheme(id) {
-    var t = THEMES[id] || THEMES.blue;
+    var t = THEMES[id] || THEMES.bitcoin;
     var root = document.documentElement;
     var vars = t.vars || {};
     Object.keys(vars).forEach(function (k) {

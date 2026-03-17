@@ -92,7 +92,14 @@ function createGradient(ctx, color, height) {
 // Mobile: allow tapping Tools dropdown to open/close
 function toggleMobileToolsMenu(e) {
   try { e.preventDefault(); e.stopPropagation(); } catch (err) {}
-  const dd = (e && e.target) ? e.target.closest('.nav-dropdown') : null;
+
+  // iOS Safari: e.target can be a text node; also, closest() can fail on non-Elements.
+  let t = (e && e.target) ? e.target : null;
+  let el = null;
+  if (t && t.nodeType === 1) el = t;
+  else if (t && t.nodeType === 3) el = t.parentElement;
+
+  const dd = el && el.closest ? el.closest('.nav-dropdown') : null;
   if (!dd) return;
   dd.classList.toggle('open');
 }
@@ -108,7 +115,13 @@ function closeAllNavDropdowns() {
 // handler could close the menu before the button's onclick fires.
 function handleOutsideNavDropdown(e) {
   try {
-    if (e && e.target && e.target.closest && e.target.closest('.nav-dropdown')) return;
+    // iOS Safari can report a Text node as the event target; normalize to an Element.
+    var t = (e && e.target) ? e.target : null;
+    var el = null;
+    if (t && t.nodeType === 1) el = t; // Element
+    else if (t && t.nodeType === 3) el = t.parentElement; // Text
+
+    if (el && el.closest && el.closest('.nav-dropdown')) return;
   } catch (err) {}
   closeAllNavDropdowns();
 }

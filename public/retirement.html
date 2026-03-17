@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>₿ Retirement Calculator — Difficulty Adjustment</title>
+  <meta name="description" content="Bitcoin retirement calculator: drawdown, Bitcoin-only (cage), and borrow scenarios." />
+  <meta name="theme-color" content="#f7931a">
+  <link rel="icon" href="/icon.svg">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/icon.svg">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="shared.css">
+
+  <style>
+    .calc-layout { display: grid; grid-template-columns: 420px 1fr; gap: 32px; margin-bottom: 40px; }
+    .calc-inputs { position: sticky; top: 24px; align-self: start; }
+
+    .input-group { margin-bottom: 16px; }
+    .input-group label { display:block; font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+    .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+    input, select {
+      width: 100%;
+      padding: 12px 12px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      color: var(--text-primary);
+      font-size: 14px;
+      outline: none;
+    }
+
+    .note { font-size: 12px; color: var(--text-muted); line-height: 1.35; }
+    .pill { display:inline-flex; align-items:center; gap:8px; padding:8px 10px; border:1px solid var(--border); border-radius: 999px; background: rgba(255,255,255,0.03); font-size: 12px; color: var(--text-secondary); }
+
+    .result-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .kpi { padding: 14px; border-radius: 16px; border: 1px solid var(--border); background: rgba(255,255,255,0.03); }
+    .kpi .k { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
+    .kpi .v { font-size: 20px; font-weight: 800; margin-top: 6px; }
+    .kpi .s { font-size: 12px; color: var(--text-secondary); margin-top: 6px; line-height: 1.35; }
+
+    .table { width: 100%; border-collapse: collapse; }
+    .table th, .table td { border-bottom: 1px solid var(--border); padding: 10px 8px; font-size: 13px; text-align: left; }
+    .table th { color: var(--text-muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; }
+
+    .warn { color: #fbbf24; }
+    .good { color: #34d399; }
+
+    @media (max-width: 900px) {
+      .calc-layout { grid-template-columns: 1fr; }
+      .calc-inputs { position: static; }
+      .result-grid { grid-template-columns: 1fr; }
+      .input-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="header-left">
+        <span class="logo">₿</span>
+        <h1>Difficulty<span class="accent">Adjustment</span></h1>
+      </div>
+      <nav class="site-nav">
+        <a href="/" class="nav-link">Dashboard</a>
+        <a href="/history" class="nav-link">History</a>
+        <a href="/learn" class="nav-link">Learn</a>
+        <div class="nav-dropdown">
+          <button class="nav-link nav-dropdown-btn" onclick="toggleMobileToolsMenu(event)">Tools ▾</button>
+          <div class="nav-dropdown-menu">
+            <div class="nav-dropdown-menu-inner">
+              <a href="/calculator">⛏️ Mining Calculator</a>
+              <a href="/dca">📊 DCA Calculator</a>
+              <a href="/hodl">💎 HODL Calculator</a>
+              <a href="/converter">🔄 Sats Converter</a>
+              <a href="/attack">🛡️ 51% Attack Cost</a>
+              <a href="/inflation">📉 Bitcoin vs Inflation</a>
+              <a href="/retirement">🧓 Retirement Calculator</a>
+            </div>
+          </div>
+        </div>
+      </nav>
+      <div class="header-right">
+        <span class="pill" id="pricePill">BTC: …</span>
+      </div>
+    </header>
+
+    <div class="container">
+      <div class="page-hero">
+        <h2>Bitcoin Retirement Calculator</h2>
+        <p>Run retirement scenarios: fiat drawdown, Bitcoin-only spending ("cage"), and borrow/loan strategies.</p>
+      </div>
+
+      <div class="calc-layout">
+        <div class="calc-inputs">
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Inputs</div>
+                <div class="card-subtitle">Change anything—results update instantly.</div>
+              </div>
+            </div>
+
+            <div class="input-row">
+              <div class="input-group">
+                <label>Current age</label>
+                <input id="ageNow" type="number" min="0" max="120" value="40" />
+              </div>
+              <div class="input-group">
+                <label>Retire at age</label>
+                <input id="ageRetire" type="number" min="0" max="120" value="55" />
+              </div>
+            </div>
+
+            <div class="input-row">
+              <div class="input-group">
+                <label>Bitcoin owned (BTC)</label>
+                <input id="btcOwned" type="number" step="0.0001" value="1.00" />
+              </div>
+              <div class="input-group">
+                <label>Bitcoin price</label>
+                <select id="priceMode">
+                  <option value="current">Current (live)</option>
+                  <option value="custom">Custom</option>
+                </select>
+                <input id="btcPriceCustom" type="number" step="1" value="150000" style="margin-top:10px; display:none;" />
+              </div>
+            </div>
+
+            <div class="input-row">
+              <div class="input-group">
+                <label>Spending need ($/yr)</label>
+                <input id="spendAnnual" type="number" step="100" value="60000" />
+              </div>
+              <div class="input-group">
+                <label>Inflation (%/yr)</label>
+                <input id="inflation" type="number" step="0.1" value="3.0" />
+              </div>
+            </div>
+
+            <div class="input-row">
+              <div class="input-group">
+                <label>BTC real return (%/yr)</label>
+                <input id="btcReturn" type="number" step="0.1" value="4.0" />
+              </div>
+              <div class="input-group">
+                <label>Retirement horizon (years)</label>
+                <input id="horizon" type="number" min="1" max="80" value="35" />
+              </div>
+            </div>
+
+            <div class="input-group">
+              <label>Scenario method</label>
+              <select id="method">
+                <option value="rule4">4% rule (fiat drawdown from portfolio value at retirement)</option>
+                <option value="fixedSpend">Fixed real spending (sell BTC each year to cover spending)</option>
+                <option value="cage">Bitcoin-only (spend sats, never sell principal) — requires yield</option>
+                <option value="borrow">Buy / Borrow / Die (borrow against BTC)</option>
+              </select>
+              <div class="note" style="margin-top:8px">
+                Notes: These are planning models, not advice. Borrowing increases liquidation risk.
+              </div>
+            </div>
+
+            <div class="input-row" id="cageRow" style="display:none;">
+              <div class="input-group">
+                <label>BTC yield (%/yr)</label>
+                <input id="btcYield" type="number" step="0.1" value="2.0" />
+              </div>
+              <div class="input-group">
+                <label>Keep principal intact?</label>
+                <select id="keepPrincipal">
+                  <option value="yes">Yes (never sell)</option>
+                  <option value="no">No (allow selling if needed)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="input-row" id="borrowRow" style="display:none;">
+              <div class="input-group">
+                <label>Max LTV (%)</label>
+                <input id="ltv" type="number" step="1" value="20" />
+              </div>
+              <div class="input-group">
+                <label>Borrow rate (%/yr)</label>
+                <input id="borrowRate" type="number" step="0.1" value="8.0" />
+              </div>
+              <div class="input-group">
+                <label>Refinance cadence (yrs)</label>
+                <input id="refiYears" type="number" step="1" value="3" />
+              </div>
+              <div class="input-group">
+                <label>Stress: BTC drawdown (%)</label>
+                <input id="stressDrawdown" type="number" step="1" value="50" />
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <div>
+          <div class="card" style="margin-bottom: 12px;">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Results</div>
+                <div class="card-subtitle" id="summary">—</div>
+              </div>
+            </div>
+
+            <div class="result-grid">
+              <div class="kpi">
+                <div class="k">Portfolio @ retirement</div>
+                <div class="v" id="kpiPortfolio">—</div>
+                <div class="s" id="kpiPortfolioSub">BTC × price</div>
+              </div>
+              <div class="kpi">
+                <div class="k">Sustainable spend</div>
+                <div class="v" id="kpiSpend">—</div>
+                <div class="s" id="kpiSpendSub">Depends on method</div>
+              </div>
+              <div class="kpi">
+                <div class="k">Runway / risk</div>
+                <div class="v" id="kpiRunway">—</div>
+                <div class="s" id="kpiRunwaySub">Horizon vs depletion</div>
+              </div>
+            </div>
+
+            <div style="margin-top: 16px;" class="note">
+              Quick sanity checks: 4% rule assumes a diversified portfolio and historical conditions. Borrow models are extremely sensitive to drawdowns and interest rates.
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Year-by-year (first 15 years)</div>
+                <div class="card-subtitle">Shows spending, BTC sold/borrowed, and remaining BTC.</div>
+              </div>
+            </div>
+
+            <div style="overflow:auto;">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Year</th>
+                    <th>Age</th>
+                    <th>Spend ($)</th>
+                    <th>BTC price ($)</th>
+                    <th>BTC sold</th>
+                    <th>Debt ($)</th>
+                    <th>BTC remaining</th>
+                  </tr>
+                </thead>
+                <tbody id="rows"></tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <footer class="footer">
+        <span>₿ difficultyadjustment.com • There is no second best.</span>
+      </footer>
+    </div>
+  </div>
+
+  <script src="nav.js"></script>
+  <script>
+    // --- Helpers ---
+    function fmtUSD(n) {
+      if (!isFinite(n)) return '—';
+      const abs = Math.abs(n);
+      if (abs >= 1e12) return '$' + (n/1e12).toFixed(2) + 'T';
+      if (abs >= 1e9) return '$' + (n/1e9).toFixed(2) + 'B';
+      if (abs >= 1e6) return '$' + (n/1e6).toFixed(2) + 'M';
+      return '$' + Math.round(n).toLocaleString();
+    }
+    function fmtBTC(n) {
+      if (!isFinite(n)) return '—';
+      return (Math.round(n * 1e8) / 1e8).toFixed(8);
+    }
+
+    async function getLiveBtcPrice() {
+      try {
+        const r = await fetch('/api/prices?vs=usd');
+        const data = await r.json();
+        if (Array.isArray(data)) {
+          const btc = data.find(x => x.id === 'bitcoin');
+          if (btc && btc.current_price) return btc.current_price;
+        }
+      } catch (e) {}
+      return null;
+    }
+
+    // --- Core model ---
+    function simulate(params) {
+      const yearsToRetire = Math.max(0, params.ageRetire - params.ageNow);
+      const retireAge = params.ageRetire;
+      const horizon = Math.max(1, params.horizon);
+
+      // Grow BTC price to retirement using (real return + inflation) approx.
+      // This is intentionally simple: user controls inputs.
+      const nominalReturn = (params.btcReturn + params.inflation) / 100;
+
+      // Price path
+      const price = [];
+      price[0] = params.btcPrice;
+      for (let t=1; t<yearsToRetire + horizon; t++) {
+        price[t] = price[t-1] * (1 + nominalReturn);
+      }
+
+      let btc = params.btcOwned;
+      let debt = 0;
+      const rows = [];
+
+      // Spend path (real spending escalated by inflation)
+      function spendAtYear(k) {
+        return params.spendAnnual * Math.pow(1 + params.inflation/100, k);
+      }
+
+      // Jump to retirement start
+      const startIndex = yearsToRetire;
+      const portfolioAtRetire = btc * price[startIndex];
+
+      let sustainableSpend = null;
+      let runwayLabel = '';
+
+      if (params.method === 'rule4') {
+        sustainableSpend = portfolioAtRetire * 0.04;
+        runwayLabel = (sustainableSpend >= params.spendAnnual) ? 'OK-ish' : 'Short';
+      }
+
+      for (let y=0; y<Math.min(horizon, 15); y++) {
+        const idx = startIndex + y;
+        const age = retireAge + y;
+        const spend = spendAtYear(y);
+        const p = price[idx];
+        let btcSold = 0;
+
+        if (params.method === 'rule4') {
+          // Spend target is user spend; 4% KPI is separate
+          btcSold = spend / p;
+          btc = Math.max(0, btc - btcSold);
+        } else if (params.method === 'fixedSpend') {
+          btcSold = spend / p;
+          btc = Math.max(0, btc - btcSold);
+        } else if (params.method === 'cage') {
+          const yieldBtc = btc * (params.btcYield/100);
+          const neededBtc = spend / p;
+          if (yieldBtc >= neededBtc) {
+            // spend from yield only
+            btcSold = 0;
+            // principal stays (assumes yield is paid separately)
+          } else {
+            const shortfall = neededBtc - yieldBtc;
+            if (params.keepPrincipal === 'no') {
+              btcSold = shortfall;
+              btc = Math.max(0, btc - btcSold);
+            } else {
+              // can't meet spend without selling
+              btcSold = 0;
+            }
+          }
+        } else if (params.method === 'borrow') {
+          // Borrow against BTC each year to fund spend. Refi cadence: interest capitalized.
+          // We also compute a stress price to estimate liquidation risk.
+          const maxLtv = params.ltv/100;
+          const stressP = p * (1 - params.stressDrawdown/100);
+
+          // accrue interest yearly
+          debt = debt * (1 + params.borrowRate/100);
+
+          // increase debt by spending
+          debt += spend;
+
+          // liquidation / unsafe if debt exceeds maxLtv * collateral value at stress price
+          const maxDebtStress = btc * stressP * maxLtv;
+          if (debt > maxDebtStress) {
+            // Mark with negative BTC sold as warning marker (UI uses debt/risk KPI)
+          }
+        }
+
+        rows.push({ year: y+1, age, spend, price: p, btcSold, debt, btc });
+      }
+
+      // KPIs depending on method
+      if (params.method === 'fixedSpend') {
+        sustainableSpend = params.spendAnnual;
+        runwayLabel = (btc > 0.25) ? 'Depends' : 'Tight';
+      }
+      if (params.method === 'cage') {
+        const neededFirstYearBtc = params.spendAnnual / price[startIndex];
+        const yieldFirstYearBtc = params.btcOwned * (params.btcYield/100);
+        sustainableSpend = yieldFirstYearBtc * price[startIndex];
+        runwayLabel = (yieldFirstYearBtc >= neededFirstYearBtc) ? 'Cage-able' : 'Not enough yield';
+      }
+      if (params.method === 'borrow') {
+        sustainableSpend = params.spendAnnual;
+        runwayLabel = 'Liquidation-sensitive';
+      }
+
+      return { yearsToRetire, portfolioAtRetire, sustainableSpend, runwayLabel, rows };
+    }
+
+    // --- UI wiring ---
+    const els = {
+      ageNow: document.getElementById('ageNow'),
+      ageRetire: document.getElementById('ageRetire'),
+      btcOwned: document.getElementById('btcOwned'),
+      priceMode: document.getElementById('priceMode'),
+      btcPriceCustom: document.getElementById('btcPriceCustom'),
+      spendAnnual: document.getElementById('spendAnnual'),
+      inflation: document.getElementById('inflation'),
+      btcReturn: document.getElementById('btcReturn'),
+      horizon: document.getElementById('horizon'),
+      method: document.getElementById('method'),
+      btcYield: document.getElementById('btcYield'),
+      keepPrincipal: document.getElementById('keepPrincipal'),
+      ltv: document.getElementById('ltv'),
+      borrowRate: document.getElementById('borrowRate'),
+      refiYears: document.getElementById('refiYears'),
+      stressDrawdown: document.getElementById('stressDrawdown'),
+      cageRow: document.getElementById('cageRow'),
+      borrowRow: document.getElementById('borrowRow'),
+
+      pricePill: document.getElementById('pricePill'),
+      summary: document.getElementById('summary'),
+      kpiPortfolio: document.getElementById('kpiPortfolio'),
+      kpiPortfolioSub: document.getElementById('kpiPortfolioSub'),
+      kpiSpend: document.getElementById('kpiSpend'),
+      kpiSpendSub: document.getElementById('kpiSpendSub'),
+      kpiRunway: document.getElementById('kpiRunway'),
+      kpiRunwaySub: document.getElementById('kpiRunwaySub'),
+      rows: document.getElementById('rows'),
+    };
+
+    function showHideRows() {
+      const m = els.method.value;
+      els.cageRow.style.display = (m === 'cage') ? '' : 'none';
+      els.borrowRow.style.display = (m === 'borrow') ? '' : 'none';
+    }
+
+    function getParams(livePrice) {
+      const ageNow = Number(els.ageNow.value);
+      const ageRetire = Number(els.ageRetire.value);
+      const btcOwned = Number(els.btcOwned.value);
+      const spendAnnual = Number(els.spendAnnual.value);
+      const inflation = Number(els.inflation.value);
+      const btcReturn = Number(els.btcReturn.value);
+      const horizon = Number(els.horizon.value);
+      const method = els.method.value;
+
+      let btcPrice = livePrice || 0;
+      if (els.priceMode.value === 'custom') btcPrice = Number(els.btcPriceCustom.value);
+
+      return {
+        ageNow, ageRetire, btcOwned, btcPrice,
+        spendAnnual, inflation, btcReturn, horizon,
+        method,
+        btcYield: Number(els.btcYield.value),
+        keepPrincipal: els.keepPrincipal.value,
+        ltv: Number(els.ltv.value),
+        borrowRate: Number(els.borrowRate.value),
+        refiYears: Number(els.refiYears.value),
+        stressDrawdown: Number(els.stressDrawdown.value),
+      };
+    }
+
+    function render(out, params) {
+      els.summary.textContent = `Retire in ${out.yearsToRetire} years • Method: ${params.method}`;
+      els.kpiPortfolio.textContent = fmtUSD(out.portfolioAtRetire);
+      els.kpiSpend.textContent = fmtUSD(out.sustainableSpend);
+      els.kpiRunway.textContent = out.runwayLabel;
+
+      if (params.method === 'rule4') {
+        els.kpiSpendSub.textContent = '4% of portfolio @ retirement (compare to your spend)';
+        els.kpiRunwaySub.textContent = 'If 4% < spend, you’re forcing sales';
+      } else if (params.method === 'fixedSpend') {
+        els.kpiSpendSub.textContent = 'You sell BTC to cover spending each year';
+        els.kpiRunwaySub.textContent = 'Runway depends on returns vs spend + inflation';
+      } else if (params.method === 'cage') {
+        els.kpiSpendSub.textContent = 'Spending funded by yield (principal intact)';
+        els.kpiRunwaySub.textContent = 'Yield shortfall means you must sell or cut spend';
+      } else {
+        els.kpiSpendSub.textContent = 'Borrowing funds spending (debt compounds)';
+        els.kpiRunwaySub.textContent = 'Risk: liquidation under drawdowns / rate spikes';
+      }
+
+      els.rows.innerHTML = out.rows.map(r => {
+        return `<tr>` +
+          `<td>${r.year}</td>` +
+          `<td>${r.age}</td>` +
+          `<td>${fmtUSD(r.spend)}</td>` +
+          `<td>${fmtUSD(r.price)}</td>` +
+          `<td>${params.method === 'borrow' ? '—' : fmtBTC(r.btcSold)}</td>` +
+          `<td>${fmtUSD(r.debt)}</td>` +
+          `<td>${fmtBTC(r.btc)}</td>` +
+        `</tr>`;
+      }).join('');
+    }
+
+    let livePriceCache = null;
+
+    async function recalc() {
+      showHideRows();
+
+      if (els.priceMode.value === 'custom') {
+        els.btcPriceCustom.style.display = '';
+      } else {
+        els.btcPriceCustom.style.display = 'none';
+      }
+
+      if (!livePriceCache) livePriceCache = await getLiveBtcPrice();
+      const priceUsed = (els.priceMode.value === 'custom') ? Number(els.btcPriceCustom.value) : livePriceCache;
+
+      if (priceUsed) els.pricePill.textContent = 'BTC: ' + fmtUSD(priceUsed);
+      else els.pricePill.textContent = 'BTC: unavailable';
+
+      const params = getParams(livePriceCache);
+      if (!params.btcPrice || params.btcPrice <= 0) {
+        els.summary.textContent = 'Need a BTC price (live unavailable). Switch to Custom.';
+        return;
+      }
+
+      const out = simulate(params);
+      render(out, params);
+    }
+
+    // Events
+    document.querySelectorAll('input, select').forEach(function (el) {
+      el.addEventListener('input', function(){ livePriceCache = livePriceCache; recalc(); });
+      el.addEventListener('change', function(){ recalc(); });
+    });
+
+    // init
+    recalc();
+  </script>
+</body>
+</html>

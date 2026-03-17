@@ -123,6 +123,10 @@ app.get('/hodl', (req, res) => {
   res.sendFile('hodl.html', { root: path.join(__dirname, 'public') });
 });
 
+app.get('/retirement', (req, res) => {
+  res.sendFile('retirement.html', { root: path.join(__dirname, 'public') });
+});
+
 // ===== API ROUTES =====
 
 // In-memory cache to avoid hammering free APIs
